@@ -2,7 +2,13 @@ import os
 import logging
 from flask import Flask
 from flask_migrate import Migrate
-from config.config import config
+try:
+    from config.config import config
+except ModuleNotFoundError:
+    import sys
+    import os
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'config')))
+    from config import config
 from app.models import db, init_db
 
 # Configure logging
