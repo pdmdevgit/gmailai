@@ -77,9 +77,10 @@ services:
       - gmail_ai_network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 60s
+      interval: 30s
 
   # Email Monitor Service
   monitor:
