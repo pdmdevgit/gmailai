@@ -1,0 +1,148 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: gmail_ai_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-gmail_ai_root_pass}
+      MYSQL_DATABASE: ${MYSQL_DB:-gmail_ai_agent}
+      MYSQL_USER: ${MYSQL_USER:-gmail_ai_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-gmail_ai_pass}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - gmail_ai_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: gmail_ai_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-gmail_ai_redis_pass}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - gmail_ai_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      timeout: 3s
+      retries: 5
+
+  # Gmail AI Agent Web Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gmail_ai_web
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key}
+      - MYSQL_HOST=mysql
+      - MYSQL_USER=${MYSQL_USER:-gmail_ai_user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-gmail_ai_pass}
+      - MYSQL_DB=${MYSQL_DB:-gmail_ai_agent}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-gmail_ai_redis_pass}@redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_MODEL=${AI_MODEL:-gpt-4}
+      - EMAIL_CHECK_INTERVAL=${EMAIL_CHECK_INTERVAL:-300}
+      - MAX_EMAILS_PER_BATCH=${MAX_EMAILS_PER_BATCH:-50}
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - gmail_tokens:/app/config/tokens
+    ports:
+      - "5000:5000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - gmail_ai_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Email Monitor Service
+  monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gmail_ai_monitor
+    restart: unless-stopped
+    command: python monitor.py
+    environment:
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-key}
+      - MYSQL_HOST=mysql
+      - MYSQL_USER=${MYSQL_USER:-gmail_ai_user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-gmail_ai_pass}
+      - MYSQL_DB=${MYSQL_DB:-gmail_ai_agent}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-gmail_ai_redis_pass}@redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AI_MODEL=${AI_MODEL:-gpt-4}
+      - EMAIL_CHECK_INTERVAL=${EMAIL_CHECK_INTERVAL:-300}
+      - MAX_EMAILS_PER_BATCH=${MAX_EMAILS_PER_BATCH:-50}
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - gmail_tokens:/app/config/tokens
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    networks:
+      - gmail_ai_network
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: gmail_ai_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - web
+    networks:
+      - gmail_ai_network
+    profiles:
+      - production
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  gmail_tokens:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  gmail_ai_network:
+    driver: bridge
