@@ -19,9 +19,11 @@ services:
     networks:
       - gmail_ai_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-gmail_ai_root_pass}"]
       timeout: 20s
       retries: 10
+      start_period: 30s
+      interval: 10s
 
   # Redis Cache
   redis:
