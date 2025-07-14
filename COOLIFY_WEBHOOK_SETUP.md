@@ -75,6 +75,29 @@ application/json
 
 ## Troubleshooting
 
+### Erro 401 (Unauthorized) - PROBLEMA IDENTIFICADO:
+**Sintomas:** Webhook retorna "Response 401" no GitHub
+**Causa:** Falta de autenticação ou token incorreto
+
+**Soluções:**
+
+#### Opção 1: Verificar Token no Coolify
+1. No painel do Coolify, vá em **Settings > Webhooks**
+2. Verifique se há um **token/secret** configurado
+3. Se houver, copie este token
+4. No GitHub webhook, adicione este token no campo **Secret**
+
+#### Opção 2: Recriar o Webhook no Coolify
+1. No Coolify, **delete o webhook atual**
+2. **Crie um novo webhook**
+3. **Copie a nova URL** gerada
+4. **Atualize o webhook no GitHub** com a nova URL
+
+#### Opção 3: Verificar Permissões
+1. Confirme se o **repositório é público** ou
+2. Se privado, verifique se o **Coolify tem acesso** ao repositório
+3. Pode ser necessário **reautorizar** a conexão GitHub-Coolify
+
 ### Webhook não funciona:
 1. **Verifique a URL** do webhook no Coolify
 2. **Confirme se o repositório é público** ou se o Coolify tem acesso
@@ -85,6 +108,13 @@ application/json
 1. **Verifique se o branch está correto** (main)
 2. **Confirme se há alterações** no código
 3. **Verifique os logs do Coolify** para erros
+
+### Solução Temporária (Deploy Manual):
+Se o webhook não funcionar imediatamente:
+1. **Vá ao painel do Coolify**
+2. **Clique em "Deploy" manualmente**
+3. **Adicione as chaves de API** nas variáveis de ambiente
+4. **Monitore o deploy** para ver se funciona
 
 ## Configuração Recomendada
 
