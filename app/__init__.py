@@ -28,15 +28,30 @@ except ImportError:
 
 from app.models import db, init_db
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/gmail_ai_agent.log'),
-        logging.StreamHandler()
-    ]
-)
+# Configure logging with error handling
+def setup_logging():
+    """Setup logging with fallback to console only if file logging fails"""
+    handlers = [logging.StreamHandler()]  # Always have console logging
+    
+    try:
+        # Create logs directory if it doesn't exist
+        os.makedirs('logs', exist_ok=True)
+        # Try to create file handler
+        file_handler = logging.FileHandler('logs/gmail_ai_agent.log')
+        handlers.append(file_handler)
+    except (PermissionError, OSError) as e:
+        # If file logging fails, just use console logging
+        print(f"Warning: Could not setup file logging: {e}")
+        print("Using console logging only")
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=handlers
+    )
+
+# Setup logging
+setup_logging()
 
 migrate = Migrate()
 
@@ -51,9 +66,6 @@ def create_app(config_name=None):
     # Initialize extensions
     init_db(app)
     migrate.init_app(app, db)
-    
-    # Create logs directory
-    os.makedirs('logs', exist_ok=True)
     
     # Register blueprints
     from app.api.email_routes import email_bp
