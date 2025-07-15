@@ -22,6 +22,41 @@ except (ImportError, ModuleNotFoundError):
         # Gmail API Configuration
         GMAIL_CREDENTIALS_FILE = os.environ.get('GMAIL_CREDENTIALS_FILE', 'config/gmail_credentials.json')
         GMAIL_TOKEN_DIR = os.environ.get('GMAIL_TOKEN_DIR', 'config/tokens')
+        
+        # AI Configuration
+        OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+        ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
+        AI_MODEL = os.environ.get('AI_MODEL', 'gpt-4')
+        
+        # Business Configuration
+        BUSINESS_NAME = "Prof. Diogo Moreira"
+        BUSINESS_DOMAIN = "profdiogomoreira.com.br"
+        
+        # Products Configuration
+        PRODUCTS = {
+            'coaching': {
+                'name': 'Coaching Individual',
+                'price': 1497,
+                'description': 'Mentoria personalizada para aprovação em concursos fiscais'
+            },
+            'acelerador': {
+                'name': 'Acelerador',
+                'price': 497,
+                'description': 'Curso com metodologia dos 9 passos para concursos'
+            }
+        }
+        
+        # Email Classification Settings
+        CLASSIFICATION_CONFIDENCE_THRESHOLD = 0.7
+        AUTO_RESPONSE_THRESHOLD = 0.85
+        
+        # Rate Limiting
+        GMAIL_API_RATE_LIMIT = 250
+        AI_API_RATE_LIMIT = 60
+        
+        # Monitoring Settings
+        EMAIL_CHECK_INTERVAL = 300
+        MAX_EMAILS_PER_BATCH = 50
 
 logger = logging.getLogger(__name__)
 
