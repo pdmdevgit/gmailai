@@ -116,8 +116,9 @@ def create_app(config_name=None):
         config_name = os.environ.get('FLASK_ENV', 'development')
     
     # Configure Flask to use static files from project root
+    static_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'static')
     app = Flask(__name__, 
-                static_folder='../static',
+                static_folder=static_path,
                 template_folder='templates')
     app.config.from_object(config[config_name])
     
