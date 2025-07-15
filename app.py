@@ -43,10 +43,22 @@ def setup_database(app):
 def main():
     """Main application entry point"""
     try:
+        # Debug environment variables
+        logger.info("=== Environment Debug ===")
+        logger.info(f"MYSQL_HOST: {os.environ.get('MYSQL_HOST', 'NOT SET')}")
+        logger.info(f"MYSQL_USER: {os.environ.get('MYSQL_USER', 'NOT SET')}")
+        logger.info(f"MYSQL_PASSWORD: {'SET' if os.environ.get('MYSQL_PASSWORD') else 'NOT SET'}")
+        logger.info(f"MYSQL_DB: {os.environ.get('MYSQL_DB', 'NOT SET')}")
+        
         # Create Flask app
+        logger.info("Creating Flask app...")
         app = create_app()
         
+        # Debug database URI
+        logger.info(f"Database URI: {app.config.get('SQLALCHEMY_DATABASE_URI', 'NOT SET')}")
+        
         # Setup database
+        logger.info("Setting up database...")
         setup_database(app)
         
         # Get configuration
@@ -68,6 +80,8 @@ def main():
         
     except Exception as e:
         logger.error(f"Failed to start application: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         sys.exit(1)
 
 if __name__ == '__main__':
