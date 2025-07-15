@@ -11,7 +11,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
 from .gmail_service import GmailService
-from ..models import Email, ResponseTemplate
+from ..models import Email, EmailResponse
 
 logger = logging.getLogger(__name__)
 
