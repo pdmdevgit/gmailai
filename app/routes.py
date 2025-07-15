@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, jsonify, current_app, request
 from app.models import db, Email, EmailResponse, ProcessingLog
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, text
 from datetime import datetime, timedelta
 
 main_bp = Blueprint('main', __name__)
@@ -15,7 +15,7 @@ def health_check():
     """Health check endpoint"""
     try:
         # Test database connection
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         db_status = 'connected'
         db_error = None
     except Exception as e:

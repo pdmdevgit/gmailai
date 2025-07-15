@@ -9,6 +9,7 @@ class GmailAIAgent {
 
     init() {
         this.setupEventListeners();
+        this.checkAuthReturn();
         this.loadDashboard();
         this.startAutoRefresh();
     }
@@ -739,19 +740,12 @@ class GmailAIAgent {
             });
 
             if (result.auth_url) {
-                // Open authentication URL in new window
-                const authWindow = window.open(result.auth_url, 'gmail_auth', 'width=600,height=600');
+                // Store current location to return after auth
+                sessionStorage.setItem('gmail_auth_return', window.location.href);
+                sessionStorage.setItem('gmail_auth_account', accountName);
                 
-                this.showAlert(`Janela de autenticação aberta para ${accountName}. Complete o processo na nova janela.`, 'info');
-                
-                // Check for completion periodically
-                const checkAuth = setInterval(async () => {
-                    if (authWindow.closed) {
-                        clearInterval(checkAuth);
-                        // Refresh admin section to show updated status
-                        setTimeout(() => this.loadAdmin(), 2000);
-                    }
-                }, 1000);
+                // Redirect directly to authentication URL
+                window.location.href = result.auth_url;
             } else {
                 this.showAlert('Erro ao iniciar autenticação', 'danger');
             }
@@ -914,6 +908,29 @@ class GmailAIAgent {
     stopAutoRefresh() {
         if (this.refreshInterval) {
             clearInterval(this.refreshInterval);
+        }
+    }
+
+    checkAuthReturn() {
+        // Check if user is returning from Gmail authentication
+        const authReturn = sessionStorage.getItem('gmail_auth_return');
+        const authAccount = sessionStorage.getItem('gmail_auth_account');
+        
+        if (authReturn && authAccount) {
+            // Clear session storage
+            sessionStorage.removeItem('gmail_auth_return');
+            sessionStorage.removeItem('gmail_auth_account');
+            
+            // Show success message
+            this.showAlert(`Autenticação da conta ${authAccount} concluída com sucesso!`, 'success');
+            
+            // Navigate to admin section if not already there
+            if (this.currentSection !== 'admin') {
+                this.showSection('admin');
+            } else {
+                // Refresh admin section to show updated status
+                setTimeout(() => this.loadAdmin(), 1000);
+            }
         }
     }
 }
