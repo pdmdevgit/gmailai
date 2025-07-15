@@ -75,12 +75,12 @@ services:
         condition: service_healthy
     networks:
       - gmail_ai_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/ping"]
-      timeout: 30s
-      retries: 15
-      start_period: 120s
-      interval: 20s
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:5000/ping"]
+    #   timeout: 30s
+    #   retries: 15
+    #   start_period: 120s
+    #   interval: 20s
 
   # Email Monitor Service
   monitor:
@@ -113,7 +113,7 @@ services:
       redis:
         condition: service_healthy
       web:
-        condition: service_healthy
+        condition: service_started
     networks:
       - gmail_ai_network
 
