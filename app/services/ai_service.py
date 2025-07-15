@@ -1,4 +1,4 @@
-import openai
+from openai import OpenAI
 import anthropic
 import json
 import logging
@@ -17,8 +17,7 @@ class AIService:
         self.model = model
         
         if openai_api_key:
-            openai.api_key = openai_api_key
-            self.openai_client = openai
+            self.openai_client = OpenAI(api_key=openai_api_key)
         
         if anthropic_api_key:
             self.anthropic_client = anthropic.Anthropic(api_key=anthropic_api_key)
@@ -198,7 +197,7 @@ Gere uma resposta completa em formato JSON:
     
     def _classify_with_openai(self, prompt: str) -> str:
         """Classify email using OpenAI"""
-        response = self.openai_client.ChatCompletion.create(
+        response = self.openai_client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": "Você é um especialista em classificação de emails para negócios de educação."},
@@ -223,7 +222,7 @@ Gere uma resposta completa em formato JSON:
     
     def _generate_with_openai(self, prompt: str) -> str:
         """Generate response using OpenAI"""
-        response = self.openai_client.ChatCompletion.create(
+        response = self.openai_client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": "Você é o Prof. Diogo Moreira, especialista em concursos fiscais."},
@@ -362,7 +361,7 @@ Responda em JSON:
 """
             
             if self.model.startswith('gpt') and self.openai_client:
-                response = self.openai_client.ChatCompletion.create(
+                response = self.openai_client.chat.completions.create(
                     model=self.model,
                     messages=[{"role": "user", "content": intent_prompt}],
                     temperature=0.1,

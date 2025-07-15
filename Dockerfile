@@ -37,7 +37,8 @@ RUN chmod +x app.py monitor.py
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash app \
-    && chown -R app:app /app
+    && chown -R app:app /app \
+    && chmod -R 755 /app/logs
 USER app
 
 # Health check
