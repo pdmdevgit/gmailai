@@ -19,10 +19,10 @@ services:
     networks:
       - gmail_ai_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-gmail_ai_root_pass}"]
-      timeout: 20s
-      retries: 10
-      start_period: 30s
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
+      timeout: 30s
+      retries: 15
+      start_period: 60s
       interval: 10s
 
   # Redis Cache
@@ -76,11 +76,11 @@ services:
     networks:
       - gmail_ai_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health", "||", "exit", "1"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/ping"]
       timeout: 30s
-      retries: 10
+      retries: 15
       start_period: 120s
-      interval: 15s
+      interval: 20s
 
   # Email Monitor Service
   monitor:
