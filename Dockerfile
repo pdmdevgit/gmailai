@@ -32,13 +32,18 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p logs config/tokens static/uploads
 
+# Ensure all Python files are present and have correct permissions
+RUN find /app -name "*.py" -exec chmod 644 {} \;
+
 # Set permissions
 RUN chmod +x app.py monitor.py
 
-# Create non-root user
+# Create non-root user and set permissions
 RUN useradd --create-home --shell /bin/bash app \
     && chown -R app:app /app \
-    && chmod -R 755 /app/logs
+    && chmod -R 777 /app/logs \
+    && chmod -R 755 /app/config
+
 USER app
 
 # Health check
