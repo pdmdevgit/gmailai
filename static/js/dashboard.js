@@ -604,6 +604,7 @@ class GmailAIAgent {
         if (!adminSection) return;
 
         const accountsHtml = `
+            <h2>Administração</h2>
             <div class="row mb-4">
                 <div class="col-12">
                     <h3>Contas Gmail</h3>
@@ -656,8 +657,8 @@ class GmailAIAgent {
             </div>
         `;
 
-        // Update admin section content
-        adminSection.innerHTML = accountsHtml + adminSection.innerHTML;
+        // Replace admin section content
+        adminSection.innerHTML = accountsHtml;
     }
 
     displaySystemSettings(settings) {
@@ -676,14 +677,14 @@ class GmailAIAgent {
                                         <div class="mb-3">
                                             <label class="form-label">Intervalo de Verificação (segundos)</label>
                                             <input type="number" class="form-control" name="email_check_interval" 
-                                                   value="${settings.email_check_interval || 300}">
+                                                   value="${settings.settings?.email_check_interval?.value || 300}">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">Máximo de Emails por Lote</label>
                                             <input type="number" class="form-control" name="max_emails_per_batch" 
-                                                   value="${settings.max_emails_per_batch || 50}">
+                                                   value="${settings.settings?.max_emails_per_batch?.value || 50}">
                                         </div>
                                     </div>
                                 </div>
@@ -692,14 +693,14 @@ class GmailAIAgent {
                                         <div class="mb-3">
                                             <label class="form-label">Limite de Confiança para Classificação</label>
                                             <input type="number" class="form-control" name="classification_threshold" 
-                                                   step="0.1" min="0" max="1" value="${settings.classification_threshold || 0.7}">
+                                                   step="0.1" min="0" max="1" value="${settings.settings?.classification_threshold?.value || 0.7}">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">Limite para Resposta Automática</label>
                                             <input type="number" class="form-control" name="auto_response_threshold" 
-                                                   step="0.1" min="0" max="1" value="${settings.auto_response_threshold || 0.85}">
+                                                   step="0.1" min="0" max="1" value="${settings.settings?.auto_response_threshold?.value || 0.85}">
                                         </div>
                                     </div>
                                 </div>
