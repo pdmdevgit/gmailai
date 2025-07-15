@@ -583,9 +583,242 @@ class GmailAIAgent {
         console.log('Loading templates...');
     }
 
-    loadAdmin() {
-        // Placeholder for admin section
-        console.log('Loading admin...');
+    async loadAdmin() {
+        try {
+            // Load Gmail accounts status
+            const accountsStatus = await this.apiCall('/api/admin/gmail-accounts/status');
+            this.displayGmailAccountsStatus(accountsStatus);
+
+            // Load system settings
+            const settings = await this.apiCall('/api/admin/settings');
+            this.displaySystemSettings(settings);
+
+        } catch (error) {
+            console.error('Error loading admin:', error);
+            this.showAlert('Erro ao carregar seção de administração', 'danger');
+        }
+    }
+
+    displayGmailAccountsStatus(data) {
+        const adminSection = document.getElementById('admin-section');
+        if (!adminSection) return;
+
+        const accountsHtml = `
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h3>Contas Gmail</h3>
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>Email</th>
+                                            <th>Status</th>
+                                            <th>Emails</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.accounts.map(account => `
+                                            <tr>
+                                                <td><strong>${account.name}</strong></td>
+                                                <td>${account.email}</td>
+                                                <td>
+                                                    <span class="badge bg-${account.is_authenticated ? 'success' : 'danger'}">
+                                                        ${account.is_authenticated ? 'Autenticado' : 'Não Autenticado'}
+                                                    </span>
+                                                </td>
+                                                <td>${account.email_count}</td>
+                                                <td>
+                                                    ${!account.is_authenticated ? `
+                                                        <button class="btn btn-primary btn-sm" onclick="app.authenticateGmailAccount('${account.name}')">
+                                                            <i class="fas fa-key me-1"></i>Autenticar
+                                                        </button>
+                                                    ` : `
+                                                        <button class="btn btn-success btn-sm" disabled>
+                                                            <i class="fas fa-check me-1"></i>Conectado
+                                                        </button>
+                                                        <button class="btn btn-outline-warning btn-sm ms-1" onclick="app.refreshGmailToken('${account.name}')">
+                                                            <i class="fas fa-sync me-1"></i>Renovar
+                                                        </button>
+                                                    `}
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Update admin section content
+        adminSection.innerHTML = accountsHtml + adminSection.innerHTML;
+    }
+
+    displaySystemSettings(settings) {
+        const adminSection = document.getElementById('admin-section');
+        if (!adminSection) return;
+
+        const settingsHtml = `
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h3>Configurações do Sistema</h3>
+                    <div class="card">
+                        <div class="card-body">
+                            <form id="system-settings-form">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Intervalo de Verificação (segundos)</label>
+                                            <input type="number" class="form-control" name="email_check_interval" 
+                                                   value="${settings.email_check_interval || 300}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Máximo de Emails por Lote</label>
+                                            <input type="number" class="form-control" name="max_emails_per_batch" 
+                                                   value="${settings.max_emails_per_batch || 50}">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Limite de Confiança para Classificação</label>
+                                            <input type="number" class="form-control" name="classification_threshold" 
+                                                   step="0.1" min="0" max="1" value="${settings.classification_threshold || 0.7}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Limite para Resposta Automática</label>
+                                            <input type="number" class="form-control" name="auto_response_threshold" 
+                                                   step="0.1" min="0" max="1" value="${settings.auto_response_threshold || 0.85}">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-save me-1"></i>Salvar Configurações
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="app.testAIService()">
+                                            <i class="fas fa-flask me-1"></i>Testar IA
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        adminSection.innerHTML += settingsHtml;
+
+        // Add form submit handler
+        document.getElementById('system-settings-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveSystemSettings(new FormData(e.target));
+        });
+    }
+
+    async authenticateGmailAccount(accountName) {
+        try {
+            this.showLoading();
+            
+            const result = await this.apiCall('/api/admin/gmail-accounts/authenticate', 'POST', {
+                account_name: accountName
+            });
+
+            if (result.auth_url) {
+                // Open authentication URL in new window
+                const authWindow = window.open(result.auth_url, 'gmail_auth', 'width=600,height=600');
+                
+                this.showAlert(`Janela de autenticação aberta para ${accountName}. Complete o processo na nova janela.`, 'info');
+                
+                // Check for completion periodically
+                const checkAuth = setInterval(async () => {
+                    if (authWindow.closed) {
+                        clearInterval(checkAuth);
+                        // Refresh admin section to show updated status
+                        setTimeout(() => this.loadAdmin(), 2000);
+                    }
+                }, 1000);
+            } else {
+                this.showAlert('Erro ao iniciar autenticação', 'danger');
+            }
+
+        } catch (error) {
+            console.error('Error authenticating Gmail account:', error);
+            this.showAlert(`Erro ao autenticar conta ${accountName}`, 'danger');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async refreshGmailToken(accountName) {
+        try {
+            this.showLoading();
+            
+            await this.apiCall('/api/admin/gmail-accounts/refresh', 'POST', {
+                account_name: accountName
+            });
+
+            this.showAlert(`Token renovado para ${accountName}`, 'success');
+            this.loadAdmin(); // Refresh admin section
+
+        } catch (error) {
+            console.error('Error refreshing Gmail token:', error);
+            this.showAlert(`Erro ao renovar token para ${accountName}`, 'danger');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async saveSystemSettings(formData) {
+        try {
+            this.showLoading();
+            
+            const settings = {};
+            for (let [key, value] of formData.entries()) {
+                settings[key] = isNaN(value) ? value : Number(value);
+            }
+
+            await this.apiCall('/api/admin/settings', 'POST', settings);
+            
+            this.showAlert('Configurações salvas com sucesso!', 'success');
+
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            this.showAlert('Erro ao salvar configurações', 'danger');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async testAIService() {
+        try {
+            this.showLoading();
+            
+            const result = await this.apiCall('/api/admin/test-ai', 'POST', {
+                test_message: 'Teste de conectividade com o serviço de IA'
+            });
+
+            this.showAlert(`Teste de IA concluído: ${result.status}`, result.success ? 'success' : 'warning');
+
+        } catch (error) {
+            console.error('Error testing AI service:', error);
+            this.showAlert('Erro ao testar serviço de IA', 'danger');
+        } finally {
+            this.hideLoading();
+        }
     }
 
     // Utility methods
