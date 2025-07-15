@@ -27,6 +27,53 @@ except (ImportError, ModuleNotFoundError) as e:
         SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:3306/{MYSQL_DB}"
         SQLALCHEMY_TRACK_MODIFICATIONS = False
         DEBUG = os.environ.get('FLASK_ENV') == 'development'
+        
+        # Gmail API Configuration
+        GMAIL_CREDENTIALS_FILE = os.environ.get('GMAIL_CREDENTIALS_FILE', 'config/gmail_credentials.json')
+        GMAIL_TOKEN_DIR = os.environ.get('GMAIL_TOKEN_DIR', 'config/tokens')
+        
+        # Gmail Accounts to Monitor
+        GMAIL_ACCOUNTS = {
+            'contato': 'contato@profdiogomoreira.com.br',
+            'cursos': 'cursos@profdiogomoreira.com.br', 
+            'diogo': 'diogo@profdiogomoreira.com.br',
+            'sac': 'sac@profdiogomoreira.com.br'
+        }
+        
+        # AI Configuration
+        OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+        ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY')
+        AI_MODEL = os.environ.get('AI_MODEL', 'gpt-4')
+        
+        # Business Configuration
+        BUSINESS_NAME = "Prof. Diogo Moreira"
+        BUSINESS_DOMAIN = "profdiogomoreira.com.br"
+        
+        # Products Configuration
+        PRODUCTS = {
+            'coaching': {
+                'name': 'Coaching Individual',
+                'price': 1497,
+                'description': 'Mentoria personalizada para aprovação em concursos fiscais'
+            },
+            'acelerador': {
+                'name': 'Acelerador',
+                'price': 497,
+                'description': 'Curso com metodologia dos 9 passos para concursos'
+            }
+        }
+        
+        # Email Classification Settings
+        CLASSIFICATION_CONFIDENCE_THRESHOLD = 0.7
+        AUTO_RESPONSE_THRESHOLD = 0.85
+        
+        # Rate Limiting
+        GMAIL_API_RATE_LIMIT = 250
+        AI_API_RATE_LIMIT = 60
+        
+        # Monitoring Settings
+        EMAIL_CHECK_INTERVAL = 300
+        MAX_EMAILS_PER_BATCH = 50
     
     config = {
         'production': Config(),
