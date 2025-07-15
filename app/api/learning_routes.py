@@ -18,10 +18,22 @@ except (ImportError, ModuleNotFoundError):
         MYSQL_USER = os.environ.get('MYSQL_USER', 'gmail_ai_user')
         MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'gmail_ai_pass')
         MYSQL_DB = os.environ.get('MYSQL_DB', 'gmail_ai_agent')
+        REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+        SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:3306/{MYSQL_DB}"
+        SQLALCHEMY_TRACK_MODIFICATIONS = False
+        DEBUG = os.environ.get('FLASK_ENV') == 'development'
         
         # Gmail API Configuration
         GMAIL_CREDENTIALS_FILE = os.environ.get('GMAIL_CREDENTIALS_FILE', 'config/gmail_credentials.json')
         GMAIL_TOKEN_DIR = os.environ.get('GMAIL_TOKEN_DIR', 'config/tokens')
+        
+        # Gmail Accounts to Monitor
+        GMAIL_ACCOUNTS = {
+            'contato': 'contato@profdiogomoreira.com.br',
+            'cursos': 'cursos@profdiogomoreira.com.br', 
+            'diogo': 'diogo@profdiogomoreira.com.br',
+            'sac': 'sac@profdiogomoreira.com.br'
+        }
         
         # AI Configuration
         OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
