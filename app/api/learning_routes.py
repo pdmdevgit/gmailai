@@ -18,6 +18,10 @@ except (ImportError, ModuleNotFoundError):
         MYSQL_USER = os.environ.get('MYSQL_USER', 'gmail_ai_user')
         MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'gmail_ai_pass')
         MYSQL_DB = os.environ.get('MYSQL_DB', 'gmail_ai_agent')
+        
+        # Gmail API Configuration
+        GMAIL_CREDENTIALS_FILE = os.environ.get('GMAIL_CREDENTIALS_FILE', 'config/gmail_credentials.json')
+        GMAIL_TOKEN_DIR = os.environ.get('GMAIL_TOKEN_DIR', 'config/tokens')
 
 logger = logging.getLogger(__name__)
 
