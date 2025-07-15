@@ -11,7 +11,11 @@ sys.path.insert(0, project_root)
 # Import config with fallback
 try:
     from config.config import config
-except ImportError:
+    print("Successfully imported config from config.config")
+except (ImportError, ModuleNotFoundError) as e:
+    print(f"Could not import config.config: {e}")
+    print("Using fallback configuration")
+    
     # Fallback config for Docker environment
     class Config:
         SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -24,7 +28,11 @@ except ImportError:
         SQLALCHEMY_TRACK_MODIFICATIONS = False
         DEBUG = os.environ.get('FLASK_ENV') == 'development'
     
-    config = {'production': Config(), 'development': Config()}
+    config = {
+        'production': Config(),
+        'development': Config(),
+        'default': Config()
+    }
 
 from app.models import db, init_db
 
