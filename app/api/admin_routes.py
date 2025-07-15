@@ -225,7 +225,7 @@ def update_settings():
 
 @admin_bp.route('/gmail-accounts/authenticate', methods=['POST'])
 def authenticate_gmail_account():
-    """Authenticate a Gmail account"""
+    """Start Gmail account authentication flow"""
     try:
         data = request.get_json()
         account_name = data.get('account_name')
@@ -239,27 +239,52 @@ def authenticate_gmail_account():
         
         email_address = accounts[account_name]
         
-        # Initialize Gmail service
-        gmail_service = GmailService(
-            credentials_file=current_app.config.get('GMAIL_CREDENTIALS_FILE'),
-            token_dir=current_app.config.get('GMAIL_TOKEN_DIR')
+        # Create OAuth flow
+        from google_auth_oauthlib.flow import Flow
+        
+        flow = Flow.from_client_secrets_file(
+            current_app.config.get('GMAIL_CREDENTIALS_FILE'),
+            scopes=[
+                'https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/gmail.send',
+                'https://www.googleapis.com/auth/gmail.modify'
+            ]
         )
         
-        # Authenticate account
-        success = gmail_service.authenticate_account(account_name, email_address)
+        # Set redirect URI
+        flow.redirect_uri = f"{request.host_url}auth/callback"
         
-        if success:
-            return jsonify({
-                'message': f'Account {account_name} authenticated successfully',
-                'account': account_name,
-                'email': email_address
-            })
-        else:
-            return jsonify({'error': 'Authentication failed'}), 500
+        # Generate authorization URL
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            login_hint=email_address
+        )
+        
+        # Store state and account info in session or cache
+        # For now, we'll use a simple approach
+        import json
+        state_data = {
+            'account_name': account_name,
+            'email_address': email_address,
+            'state': state
+        }
+        
+        # Store in a temporary file (in production, use Redis or database)
+        state_file = f"/tmp/oauth_state_{state}.json"
+        with open(state_file, 'w') as f:
+            json.dump(state_data, f)
+        
+        return jsonify({
+            'auth_url': authorization_url,
+            'state': state,
+            'account': account_name,
+            'email': email_address
+        })
         
     except Exception as e:
-        current_app.logger.error(f"Error authenticating Gmail account: {str(e)}")
-        return jsonify({'error': 'Failed to authenticate account'}), 500
+        current_app.logger.error(f"Error starting Gmail authentication: {str(e)}")
+        return jsonify({'error': f'Failed to start authentication: {str(e)}'}), 500
 
 @admin_bp.route('/gmail-accounts/status', methods=['GET'])
 def get_gmail_accounts_status():

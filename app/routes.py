@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, current_app
+from flask import Blueprint, render_template, jsonify, current_app, request
 from app.models import db, Email, EmailResponse, ProcessingLog
 from sqlalchemy import func, desc
 from datetime import datetime, timedelta
@@ -221,3 +221,92 @@ def get_system_info():
     except Exception as e:
         current_app.logger.error(f"Error getting system info: {str(e)}")
         return jsonify({'error': 'Failed to get system information'}), 500
+
+@main_bp.route('/auth/callback')
+def oauth_callback():
+    """Handle OAuth callback from Google"""
+    try:
+        import json
+        import os
+        from google_auth_oauthlib.flow import Flow
+        from google.oauth2.credentials import Credentials
+        
+        # Get state parameter
+        state = request.args.get('state')
+        if not state:
+            return "Error: Missing state parameter", 400
+        
+        # Load state data
+        state_file = f"/tmp/oauth_state_{state}.json"
+        if not os.path.exists(state_file):
+            return "Error: Invalid or expired state", 400
+        
+        with open(state_file, 'r') as f:
+            state_data = json.load(f)
+        
+        account_name = state_data['account_name']
+        email_address = state_data['email_address']
+        
+        # Create flow
+        flow = Flow.from_client_secrets_file(
+            current_app.config.get('GMAIL_CREDENTIALS_FILE'),
+            scopes=[
+                'https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/gmail.send',
+                'https://www.googleapis.com/auth/gmail.modify'
+            ],
+            state=state
+        )
+        flow.redirect_uri = f"{request.host_url}auth/callback"
+        
+        # Exchange authorization code for credentials
+        flow.fetch_token(authorization_response=request.url)
+        
+        # Save credentials
+        token_dir = current_app.config.get('GMAIL_TOKEN_DIR')
+        os.makedirs(token_dir, exist_ok=True)
+        
+        token_file = os.path.join(token_dir, f'{account_name}_token.json')
+        with open(token_file, 'w') as f:
+            f.write(flow.credentials.to_json())
+        
+        # Clean up state file
+        os.remove(state_file)
+        
+        # Return success page
+        return f"""
+        <html>
+        <head>
+            <title>Authentication Successful</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; }}
+                .success {{ color: green; font-size: 24px; margin-bottom: 20px; }}
+                .info {{ color: #666; margin-bottom: 30px; }}
+                .button {{ 
+                    background-color: #007bff; 
+                    color: white; 
+                    padding: 10px 20px; 
+                    text-decoration: none; 
+                    border-radius: 5px; 
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="success">✓ Authentication Successful!</div>
+            <div class="info">
+                Account <strong>{account_name}</strong> ({email_address}) has been authenticated successfully.
+            </div>
+            <a href="/" class="button">Return to Dashboard</a>
+            <script>
+                // Auto-close window after 3 seconds if opened in popup
+                if (window.opener) {{
+                    setTimeout(() => window.close(), 3000);
+                }}
+            </script>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        current_app.logger.error(f"OAuth callback error: {str(e)}")
+        return f"Authentication failed: {str(e)}", 500
