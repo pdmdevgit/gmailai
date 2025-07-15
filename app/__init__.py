@@ -8,7 +8,24 @@ from flask_migrate import Migrate
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from config.config import config
+# Import config with fallback
+try:
+    from config.config import config
+except ImportError:
+    # Fallback config for Docker environment
+    class Config:
+        SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+        MYSQL_HOST = os.environ.get('MYSQL_HOST', 'mysql')
+        MYSQL_USER = os.environ.get('MYSQL_USER', 'gmail_ai_user')
+        MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'gmail_ai_pass')
+        MYSQL_DB = os.environ.get('MYSQL_DB', 'gmail_ai_agent')
+        REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+        SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:3306/{MYSQL_DB}"
+        SQLALCHEMY_TRACK_MODIFICATIONS = False
+        DEBUG = os.environ.get('FLASK_ENV') == 'development'
+    
+    config = {'production': Config(), 'development': Config()}
+
 from app.models import db, init_db
 
 # Configure logging
