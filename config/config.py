@@ -44,7 +44,7 @@ class Config:
     PRODUCTS = {
         'coaching': {
             'name': 'Coaching Individual',
-            'price': 1497,
+            'price': 2997,
             'description': 'Mentoria personalizada para aprovação em concursos fiscais'
         },
         'acelerador': {

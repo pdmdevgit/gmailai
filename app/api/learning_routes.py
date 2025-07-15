@@ -46,11 +46,11 @@ except (ImportError, ModuleNotFoundError):
         
         # Products Configuration
         PRODUCTS = {
-            'coaching': {
-                'name': 'Coaching Individual',
-                'price': 1497,
-                'description': 'Mentoria personalizada para aprovação em concursos fiscais'
-            },
+        'coaching': {
+            'name': 'Coaching Individual',
+            'price': 2997,
+            'description': 'Mentoria personalizada para aprovação em concursos fiscais'
+        },
             'acelerador': {
                 'name': 'Acelerador',
                 'price': 497,
