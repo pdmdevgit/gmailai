@@ -14,11 +14,13 @@ class Config:
     MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD') or ''
     MYSQL_DB = os.environ.get('MYSQL_DB') or 'gmail_ai_agent'
     
-    # Use direct connection parameters instead of URL to avoid @ parsing issues
-    SQLALCHEMY_DATABASE_URI = (
-        f"mysql+pymysql://{quote_plus(MYSQL_USER)}:{quote_plus(MYSQL_PASSWORD)}"
-        f"@{MYSQL_HOST}:3306/{MYSQL_DB}"
-    )
+    # Build database URI with proper escaping - escape each component separately
+    _user = quote_plus(MYSQL_USER) if MYSQL_USER else ''
+    _password = quote_plus(MYSQL_PASSWORD) if MYSQL_PASSWORD else ''
+    _host = MYSQL_HOST or 'localhost'
+    _db = MYSQL_DB or 'gmail_ai_agent'
+    
+    SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{_user}:{_password}@{_host}:3306/{_db}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Redis Configuration
