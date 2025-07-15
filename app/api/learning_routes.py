@@ -6,7 +6,18 @@ from app.services.gmail_service import GmailService
 from app.services.ai_service import AIService
 from app.services.learning_service import LearningService
 from app.services.email_processor import EmailProcessor
-from config.config import Config
+# Import config with fallback
+try:
+    from config.config import Config
+except (ImportError, ModuleNotFoundError):
+    # Fallback config for Docker environment
+    import os
+    class Config:
+        SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+        MYSQL_HOST = os.environ.get('MYSQL_HOST', 'mysql')
+        MYSQL_USER = os.environ.get('MYSQL_USER', 'gmail_ai_user')
+        MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'gmail_ai_pass')
+        MYSQL_DB = os.environ.get('MYSQL_DB', 'gmail_ai_agent')
 
 logger = logging.getLogger(__name__)
 
