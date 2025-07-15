@@ -170,7 +170,7 @@ Minha metodologia é baseada na minha própria experiência de aprovação e nos
 - TCE/TCU
 - TRF/TRE
 
-O Coaching Individual (R$ 1.497) inclui:
+O Coaching Individual (R$ 2.997) inclui:
 ✓ Mentoria personalizada semanal
 ✓ Plano de estudos customizado
 ✓ Metodologia dos 9 passos

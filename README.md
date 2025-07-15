@@ -26,7 +26,7 @@ O Gmail AI Agent é uma solução completa para automatizar respostas de emails 
 - **Admin Panel:** Gerenciamento de contas e templates
 
 ### 💼 Business Logic
-- **Produtos:** Coaching Individual (R$ 1.497) e Acelerador (R$ 497)
+- **Produtos:** Coaching Individual (R$ 2.997) e Acelerador (R$ 497)
 - **Nicho:** Concursos fiscais (SEFAZ, Receita Federal, TCE, TRF)
 - **Tom:** Profissional, empático e motivador
 - **Cases:** Depoimentos de sucesso integrados
