@@ -250,7 +250,7 @@ def get_recent_activity():
                 'priority': email.classification_priority,
                 'status': email.status,
                 'created_at': email.created_at.isoformat(),
-                'time_ago': self._time_ago(email.created_at)
+                'time_ago': _time_ago(email.created_at)
             } for email in recent_emails],
             
             'responses': [{
@@ -260,7 +260,7 @@ def get_recent_activity():
                 'status': response.status,
                 'confidence': response.generation_confidence,
                 'created_at': response.created_at.isoformat(),
-                'time_ago': self._time_ago(response.created_at)
+                'time_ago': _time_ago(response.created_at)
             } for response in recent_responses],
             
             'logs': [{
@@ -270,7 +270,7 @@ def get_recent_activity():
                 'message': log.message[:100] + '...' if len(log.message) > 100 else log.message,
                 'processing_time': log.processing_time,
                 'created_at': log.created_at.isoformat(),
-                'time_ago': self._time_ago(log.created_at)
+                'time_ago': _time_ago(log.created_at)
             } for log in recent_logs]
         }
         
