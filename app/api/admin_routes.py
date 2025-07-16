@@ -253,9 +253,9 @@ def authenticate_gmail_account():
         
         # Set redirect URI - use HTTPS in production
         if request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https' or 'devpdm.com' in request.host:
-            redirect_uri = f"https://{request.host}/auth/callback"
+            redirect_uri = f"https://{request.host}/api/admin/gmail/callback"
         else:
-            redirect_uri = f"{request.host_url}auth/callback"
+            redirect_uri = f"{request.host_url}api/admin/gmail/callback"
         
         flow.redirect_uri = redirect_uri
         
@@ -495,6 +495,120 @@ def backup_system():
     except Exception as e:
         current_app.logger.error(f"Error creating backup: {str(e)}")
         return jsonify({'error': 'Failed to create backup'}), 500
+
+@admin_bp.route('/gmail/callback')
+def gmail_oauth_callback():
+    """Handle Gmail OAuth callback"""
+    try:
+        import json
+        import os
+        from google_auth_oauthlib.flow import Flow
+        from google.oauth2.credentials import Credentials
+        
+        # Get state parameter
+        state = request.args.get('state')
+        if not state:
+            return "Error: Missing state parameter", 400
+        
+        # Load state data with fallback
+        state_file = f"/tmp/oauth_states/oauth_state_{state}.json"
+        state_data = None
+        
+        # Try to load from file first
+        if os.path.exists(state_file):
+            try:
+                with open(state_file, 'r') as f:
+                    state_data = json.load(f)
+            except Exception as e:
+                current_app.logger.error(f"Error reading OAuth state file: {str(e)}")
+        
+        # Fallback to app config
+        if not state_data and hasattr(current_app, 'oauth_states'):
+            state_data = current_app.oauth_states.get(state)
+        
+        if not state_data:
+            return "Error: Invalid or expired state", 400
+        
+        account_name = state_data['account_name']
+        email_address = state_data['email_address']
+        
+        # Create flow
+        flow = Flow.from_client_secrets_file(
+            current_app.config.get('GMAIL_CREDENTIALS_FILE'),
+            scopes=[
+                'https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/gmail.send',
+                'https://www.googleapis.com/auth/gmail.modify'
+            ],
+            state=state
+        )
+        
+        # Set redirect URI - use HTTPS in production
+        if request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https' or 'devpdm.com' in request.host:
+            redirect_uri = f"https://{request.host}/api/admin/gmail/callback"
+        else:
+            redirect_uri = f"{request.host_url}api/admin/gmail/callback"
+        
+        flow.redirect_uri = redirect_uri
+        
+        # Exchange authorization code for credentials
+        flow.fetch_token(authorization_response=request.url)
+        
+        # Save credentials
+        token_dir = current_app.config.get('GMAIL_TOKEN_DIR')
+        os.makedirs(token_dir, exist_ok=True)
+        
+        token_file = os.path.join(token_dir, f'{account_name}_token.json')
+        with open(token_file, 'w') as f:
+            f.write(flow.credentials.to_json())
+        
+        # Clean up state file and app config
+        try:
+            if os.path.exists(state_file):
+                os.remove(state_file)
+        except Exception:
+            pass
+        
+        if hasattr(current_app, 'oauth_states') and state in current_app.oauth_states:
+            del current_app.oauth_states[state]
+        
+        # Return success page
+        return f"""
+        <html>
+        <head>
+            <title>Gmail Authentication Successful</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; text-align: center; padding: 50px; }}
+                .success {{ color: green; font-size: 24px; margin-bottom: 20px; }}
+                .info {{ color: #666; margin-bottom: 30px; }}
+                .button {{ 
+                    background-color: #007bff; 
+                    color: white; 
+                    padding: 10px 20px; 
+                    text-decoration: none; 
+                    border-radius: 5px; 
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="success">✓ Gmail Authentication Successful!</div>
+            <div class="info">
+                Account <strong>{account_name}</strong> ({email_address}) has been authenticated successfully.
+            </div>
+            <a href="/" class="button">Return to Dashboard</a>
+            <script>
+                // Auto-close window after 3 seconds if opened in popup
+                if (window.opener) {{
+                    setTimeout(() => window.close(), 3000);
+                }}
+            </script>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        current_app.logger.error(f"Gmail OAuth callback error: {str(e)}")
+        return f"Gmail authentication failed: {str(e)}", 500
 
 @admin_bp.route('/test-ai', methods=['POST'])
 def test_ai_service():
