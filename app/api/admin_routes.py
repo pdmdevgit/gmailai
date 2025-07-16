@@ -275,10 +275,20 @@ def authenticate_gmail_account():
             'state': state
         }
         
-        # Store in a temporary file (in production, use Redis or database)
-        state_file = f"/tmp/oauth_state_{state}.json"
-        with open(state_file, 'w') as f:
-            json.dump(state_data, f)
+        # Store in a temporary file with better error handling
+        import os
+        os.makedirs('/tmp/oauth_states', exist_ok=True)
+        state_file = f"/tmp/oauth_states/oauth_state_{state}.json"
+        
+        try:
+            with open(state_file, 'w') as f:
+                json.dump(state_data, f)
+        except Exception as e:
+            current_app.logger.error(f"Error saving OAuth state: {str(e)}")
+            # Fallback: store in app config temporarily
+            if not hasattr(current_app, 'oauth_states'):
+                current_app.oauth_states = {}
+            current_app.oauth_states[state] = state_data
         
         return jsonify({
             'auth_url': authorization_url,

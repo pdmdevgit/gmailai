@@ -236,13 +236,24 @@ def oauth_callback():
         if not state:
             return "Error: Missing state parameter", 400
         
-        # Load state data
-        state_file = f"/tmp/oauth_state_{state}.json"
-        if not os.path.exists(state_file):
-            return "Error: Invalid or expired state", 400
+        # Load state data with fallback
+        state_file = f"/tmp/oauth_states/oauth_state_{state}.json"
+        state_data = None
         
-        with open(state_file, 'r') as f:
-            state_data = json.load(f)
+        # Try to load from file first
+        if os.path.exists(state_file):
+            try:
+                with open(state_file, 'r') as f:
+                    state_data = json.load(f)
+            except Exception as e:
+                current_app.logger.error(f"Error reading OAuth state file: {str(e)}")
+        
+        # Fallback to app config
+        if not state_data and hasattr(current_app, 'oauth_states'):
+            state_data = current_app.oauth_states.get(state)
+        
+        if not state_data:
+            return "Error: Invalid or expired state", 400
         
         account_name = state_data['account_name']
         email_address = state_data['email_address']
@@ -277,8 +288,15 @@ def oauth_callback():
         with open(token_file, 'w') as f:
             f.write(flow.credentials.to_json())
         
-        # Clean up state file
-        os.remove(state_file)
+        # Clean up state file and app config
+        try:
+            if os.path.exists(state_file):
+                os.remove(state_file)
+        except Exception:
+            pass
+        
+        if hasattr(current_app, 'oauth_states') and state in current_app.oauth_states:
+            del current_app.oauth_states[state]
         
         # Return success page
         return f"""
