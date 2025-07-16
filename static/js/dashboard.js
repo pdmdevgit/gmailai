@@ -1,1267 +1,822 @@
-// Dashboard JavaScript
-class GmailAIAgent {
+// Gmail AI Agent Dashboard JavaScript
+// Prof. Diogo Moreira Email Management System
+
+class GmailAIDashboard {
     constructor() {
         this.currentSection = 'dashboard';
-        this.charts = {};
-        this.refreshInterval = null;
+        this.currentPage = 1;
+        this.itemsPerPage = 20;
         this.init();
     }
 
     init() {
         this.setupEventListeners();
-        this.checkAuthReturn();
         this.loadDashboard();
         this.startAutoRefresh();
     }
 
     setupEventListeners() {
-        // Navigation - use data-section attribute
-        document.querySelectorAll('[data-section]').forEach(link => {
+        // Navigation
+        document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const sectionName = link.getAttribute('data-section');
-                this.showSection(sectionName);
-            });
-        });
-
-        // Filter events
-        const filterElements = ['account-filter', 'status-filter', 'type-filter'];
-        filterElements.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.addEventListener('change', () => this.filterEmails());
-            }
-        });
-
-        // Search
-        const searchInput = document.getElementById('search-input');
-        if (searchInput) {
-            searchInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    this.filterEmails();
+                const section = e.target.getAttribute('data-section');
+                if (section) {
+                    this.showSection(section);
                 }
             });
-        }
-    }
-
-    showSection(sectionName) {
-        // Hide all sections
-        document.querySelectorAll('.content-section').forEach(section => {
-            section.style.display = 'none';
         });
 
-        // Show selected section
-        const targetSection = document.getElementById(`${sectionName}-section`);
-        if (targetSection) {
-            targetSection.style.display = 'block';
-            targetSection.classList.add('fade-in');
+        // Process emails button
+        const processBtn = document.getElementById('processEmailsBtn');
+        if (processBtn) {
+            processBtn.addEventListener('click', () => this.processEmails());
         }
 
+        // Bulk actions
+        const bulkActionBtn = document.getElementById('bulkActionBtn');
+        if (bulkActionBtn) {
+            bulkActionBtn.addEventListener('click', () => this.performBulkAction());
+        }
+
+        // Search and filters
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.searchEmails(e.target.value);
+            });
+        }
+
+        // Filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const filter = e.target.getAttribute('data-filter');
+                this.applyFilter(filter);
+            });
+        });
+
+        // Pagination
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('page-link')) {
+                e.preventDefault();
+                const page = parseInt(e.target.getAttribute('data-page'));
+                if (page) {
+                    this.currentPage = page;
+                    this.loadCurrentSection();
+                }
+            }
+        });
+    }
+
+    showSection(section) {
         // Update navigation
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
         });
-        document.querySelector(`[data-section="${sectionName}"]`).classList.add('active');
+        document.querySelector(`[data-section="${section}"]`).classList.add('active');
 
-        this.currentSection = sectionName;
+        // Hide all sections
+        document.querySelectorAll('.content-section').forEach(sec => {
+            sec.style.display = 'none';
+        });
 
-        // Load section-specific data
-        switch (sectionName) {
+        // Show selected section
+        const sectionElement = document.getElementById(`${section}Section`);
+        if (sectionElement) {
+            sectionElement.style.display = 'block';
+        }
+
+        this.currentSection = section;
+        this.currentPage = 1;
+        this.loadCurrentSection();
+    }
+
+    async loadCurrentSection() {
+        switch (this.currentSection) {
             case 'dashboard':
-                this.loadDashboard();
+                await this.loadDashboard();
                 break;
             case 'emails':
-                this.loadEmails();
+                await this.loadEmails();
                 break;
             case 'responses':
-                this.loadResponses();
+                await this.loadResponses();
                 break;
             case 'templates':
-                this.loadTemplates();
+                await this.loadTemplates();
                 break;
             case 'admin':
-                this.loadAdmin();
+                await this.loadAdmin();
                 break;
         }
     }
 
     async loadDashboard() {
         try {
-            // Load overview data
+            // Load overview stats
             const overview = await this.apiCall('/api/dashboard/overview');
-            this.updateOverviewCards(overview);
-
-            // Load charts
-            await this.loadCharts();
+            this.updateOverviewStats(overview);
 
             // Load recent activity
             const activity = await this.apiCall('/api/dashboard/recent-activity');
             this.updateRecentActivity(activity);
 
+            // Load charts
+            await this.loadCharts();
         } catch (error) {
             console.error('Error loading dashboard:', error);
-            this.showAlert('Erro ao carregar dashboard', 'danger');
+            this.showError('Erro ao carregar dashboard');
         }
     }
 
-    updateOverviewCards(data) {
-        // Update summary cards
-        this.updateElement('total-emails', data.summary?.total_emails || 0);
-        this.updateElement('emails-today', data.summary?.emails_today || 0);
-        this.updateElement('total-responses', data.summary?.total_responses || 0);
-        this.updateElement('responses-today', data.summary?.responses_today || 0);
-        this.updateElement('pending-responses', data.summary?.pending_responses || 0);
+    updateOverviewStats(data) {
+        if (data) {
+            document.getElementById('totalEmails').textContent = data.total_emails || 0;
+            document.getElementById('totalEmailsChange').textContent = `${data.total_emails_change || 0}%`;
+            
+            document.getElementById('responsesGenerated').textContent = data.responses_generated || 0;
+            document.getElementById('responsesGeneratedChange').textContent = `${data.responses_generated_change || 0}%`;
+            
+            document.getElementById('pendingEmails').textContent = data.pending_emails || 0;
+            
+            document.getElementById('classificationRate').textContent = `${data.classification_rate || 0}%`;
+        }
+    }
 
-        // Update rates
-        this.updateElement('classification-rate', `${data.classification?.classification_rate || 0}%`);
-        this.updateElement('response-rate', `${data.processing?.response_rate || 0}%`);
-
-        // Update growth
-        const growth = data.summary?.email_growth_pct || 0;
-        const growthElement = document.getElementById('email-growth');
-        if (growthElement) {
-            growthElement.textContent = `${growth > 0 ? '+' : ''}${growth}%`;
-            growthElement.className = growth > 0 ? 'text-success' : growth < 0 ? 'text-danger' : '';
+    updateRecentActivity(data) {
+        const container = document.getElementById('recentActivity');
+        if (container && data && data.length > 0) {
+            container.innerHTML = data.map(item => `
+                <div class="activity-item">
+                    <div class="activity-icon">
+                        <i class="fas fa-${this.getActivityIcon(item.type)}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-title">${item.title}</div>
+                        <div class="activity-time">${this.formatTime(item.timestamp)}</div>
+                    </div>
+                </div>
+            `).join('');
         }
     }
 
     async loadCharts() {
         try {
-            // Email volume chart
+            // Load email volume chart
             const volumeData = await this.apiCall('/api/dashboard/charts/email-volume');
-            this.createEmailVolumeChart(volumeData);
+            this.renderVolumeChart(volumeData);
 
-            // Classification breakdown
             const classificationData = await this.apiCall('/api/dashboard/charts/classification-breakdown');
-            this.createClassificationChart(classificationData);
-
+            this.renderClassificationChart(classificationData);
         } catch (error) {
             console.error('Error loading charts:', error);
         }
     }
 
-    createEmailVolumeChart(data) {
-        const ctx = document.getElementById('emailVolumeChart');
-        if (!ctx) return;
-
-        if (this.charts.emailVolume) {
-            this.charts.emailVolume.destroy();
-        }
-
-        this.charts.emailVolume = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.data.map(item => new Date(item.date).toLocaleDateString('pt-BR')),
-                datasets: [{
-                    label: 'Emails',
-                    data: data.data.map(item => item.emails),
-                    borderColor: '#0d6efd',
-                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
+    renderVolumeChart(data) {
+        const ctx = document.getElementById('volumeChart');
+        if (ctx && data) {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels || [],
+                    datasets: [{
+                        label: 'Emails por Dia',
+                        data: data.values || [],
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        tension: 0.4
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            stepSize: 1
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
                         }
                     }
                 }
-            }
-        });
+            });
+        }
     }
 
-    createClassificationChart(data) {
+    renderClassificationChart(data) {
         const ctx = document.getElementById('classificationChart');
-        if (!ctx) return;
-
-        if (this.charts.classification) {
-            this.charts.classification.destroy();
-        }
-
-        const colors = {
-            'vendas': '#198754',
-            'suporte': '#0dcaf0',
-            'informacao': '#ffc107',
-            'spam': '#dc3545',
-            'agendamento': '#6f42c1'
-        };
-
-        this.charts.classification = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: data.by_type.map(item => item.label),
-                datasets: [{
-                    data: data.by_type.map(item => item.value),
-                    backgroundColor: data.by_type.map(item => colors[item.label] || '#6c757d'),
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 20,
-                            usePointStyle: true
+        if (ctx && data) {
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.labels || [],
+                    datasets: [{
+                        data: data.values || [],
+                        backgroundColor: [
+                            '#28a745',
+                            '#ffc107',
+                            '#dc3545',
+                            '#17a2b8'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
                         }
                     }
                 }
-            }
-        });
-    }
-
-    updateRecentActivity(data) {
-        // Update recent emails
-        const emailsContainer = document.getElementById('recent-emails');
-        if (emailsContainer && data.emails) {
-            emailsContainer.innerHTML = data.emails.map(email => `
-                <div class="list-group-item email-preview" onclick="app.showEmailDetail(${email.id})">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="flex-grow-1">
-                            <div class="email-sender">${email.sender}</div>
-                            <div class="email-subject">${email.subject}</div>
-                            <div class="email-meta">
-                                <span class="badge bg-${email.classification || 'secondary'}">${email.classification || 'N/A'}</span>
-                                <span class="badge bg-${email.priority || 'secondary'}">${email.priority || 'N/A'}</span>
-                                <small class="text-muted ms-2">${email.time_ago}</small>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <small class="text-muted">${email.account}</small>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Update recent responses
-        const responsesContainer = document.getElementById('recent-responses');
-        if (responsesContainer && data.responses) {
-            responsesContainer.innerHTML = data.responses.map(response => `
-                <div class="list-group-item">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="flex-grow-1">
-                            <div class="fw-bold">${response.subject}</div>
-                            <div class="small text-muted">Email ID: ${response.email_id}</div>
-                            <div class="mt-1">
-                                <span class="badge bg-${this.getStatusColor(response.status)}">${response.status}</span>
-                                <div class="confidence-bar mt-1" style="width: 100px;">
-                                    <div class="confidence-fill confidence-${this.getConfidenceLevel(response.confidence)}" 
-                                         style="width: ${(response.confidence * 100)}%"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <small class="text-muted">${response.time_ago}</small>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
+            });
         }
     }
 
-    async loadEmails(page = 1) {
+    async loadEmails() {
         try {
-            this.showLoading();
+            this.showLoading('emailsContent');
             
             const params = new URLSearchParams({
-                page: page,
-                per_page: 20
+                page: this.currentPage,
+                per_page: this.itemsPerPage
             });
 
-            // Add filters
-            const filters = this.getEmailFilters();
-            Object.entries(filters).forEach(([key, value]) => {
-                if (value) params.append(key, value);
+            // Add filters if any
+            const activeFilters = this.getActiveFilters();
+            Object.keys(activeFilters).forEach(key => {
+                if (activeFilters[key]) {
+                    params.append(key, activeFilters[key]);
+                }
             });
 
             const data = await this.apiCall(`/api/emails?${params}`);
-            this.displayEmailsTable(data);
-
+            this.renderEmails(data);
         } catch (error) {
             console.error('Error loading emails:', error);
-            this.showAlert('Erro ao carregar emails', 'danger');
-        } finally {
-            this.hideLoading();
+            this.showError('Erro ao carregar emails');
         }
     }
 
-    getEmailFilters() {
-        return {
-            account: document.getElementById('account-filter')?.value || '',
-            status: document.getElementById('status-filter')?.value || '',
-            type: document.getElementById('type-filter')?.value || '',
-            search: document.getElementById('search-input')?.value || ''
-        };
-    }
-
-    displayEmailsTable(data) {
-        const container = document.getElementById('emails-table-container');
+    renderEmails(data) {
+        const container = document.getElementById('emailsContent');
         if (!container) return;
 
-        const emails = data.emails || [];
-        const pagination = data.pagination || {};
+        if (!data || !data.emails || data.emails.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <h5>Nenhum email encontrado</h5>
+                    <p class="text-muted">Não há emails para exibir no momento.</p>
+                </div>
+            `;
+            return;
+        }
 
-        container.innerHTML = `
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Remetente</th>
-                            <th>Assunto</th>
-                            <th>Conta</th>
-                            <th>Classificação</th>
-                            <th>Prioridade</th>
-                            <th>Status</th>
-                            <th>Data</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${emails.map(email => `
-                            <tr>
-                                <td>
-                                    <div class="fw-bold">${email.sender_name || email.sender_email}</div>
-                                    <small class="text-muted">${email.sender_email}</small>
-                                </td>
-                                <td>
-                                    <div class="text-truncate" style="max-width: 200px;" title="${email.subject}">
-                                        ${email.subject}
-                                    </div>
-                                    <small class="text-muted">${email.body_preview}</small>
-                                </td>
-                                <td><span class="badge bg-primary">${email.account}</span></td>
-                                <td>
-                                    ${email.classification.type ? 
-                                        `<span class="badge bg-${email.classification.type}">${email.classification.type}</span>` : 
-                                        '<span class="badge bg-secondary">N/A</span>'
-                                    }
-                                </td>
-                                <td>
-                                    ${email.classification.priority ? 
-                                        `<span class="badge bg-${email.classification.priority}">${email.classification.priority}</span>` : 
-                                        '<span class="badge bg-secondary">N/A</span>'
-                                    }
-                                </td>
-                                <td><span class="badge bg-${this.getStatusColor(email.status)}">${email.status}</span></td>
-                                <td>
-                                    <small>${new Date(email.received_at).toLocaleDateString('pt-BR')}</small><br>
-                                    <small class="text-muted">${new Date(email.received_at).toLocaleTimeString('pt-BR')}</small>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-primary" onclick="app.showEmailDetail(${email.id})" title="Ver detalhes">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        ${email.response_count > 0 ? `
-                                            <button class="btn btn-success" disabled title="Resposta já gerada">
-                                                <i class="fas fa-check"></i>
-                                            </button>
-                                        ` : `
-                                            <button class="btn btn-outline-success" onclick="app.showResponseGenerationModal(${email.id})" title="Gerar resposta">
-                                                <i class="fas fa-reply"></i>
-                                            </button>
-                                            <button class="btn btn-outline-warning" onclick="app.markForResponse(${email.id})" title="Marcar para resposta">
-                                                <i class="fas fa-star"></i>
-                                            </button>
-                                            <button class="btn btn-outline-secondary" onclick="app.skipResponse(${email.id})" title="Não responder">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        `}
-                                    </div>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+        const emailsHtml = data.emails.map(email => `
+            <div class="email-item" data-email-id="${email.id}">
+                <div class="email-header">
+                    <div class="email-from">
+                        <strong>${email.sender_name || email.sender_email}</strong>
+                        <span class="text-muted"><${email.sender_email}></span>
+                    </div>
+                    <div class="email-date">${this.formatDate(email.received_at)}</div>
+                </div>
+                <div class="email-subject">
+                    <h6>${email.subject}</h6>
+                </div>
+                <div class="email-preview">
+                    ${email.preview || email.body_text?.substring(0, 150) + '...'}
+                </div>
+                <div class="email-footer">
+                    <div class="email-status">
+                        <span class="badge badge-${this.getStatusColor(email.status)}">${this.getStatusText(email.status)}</span>
+                        ${email.classification ? `<span class="badge badge-info">${email.classification}</span>` : ''}
+                    </div>
+                    <div class="email-actions">
+                        <button class="btn btn-sm btn-outline-primary" onclick="dashboard.viewEmail('${email.id}')">
+                            <i class="fas fa-eye"></i> Ver
+                        </button>
+                        ${email.status === 'pending' ? `
+                            <button class="btn btn-sm btn-outline-success" onclick="dashboard.generateResponse('${email.id}')">
+                                <i class="fas fa-reply"></i> Responder
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
             </div>
-            ${this.createPagination(pagination)}
-        `;
+        `).join('');
+
+        container.innerHTML = emailsHtml;
+
+        // Update pagination
+        this.updatePagination(data.pagination);
     }
 
-    createPagination(pagination, loadFunction = 'loadEmails') {
-        if (!pagination.pages || pagination.pages <= 1) return '';
-
-        const pages = [];
-        const current = pagination.page;
-        const total = pagination.pages;
-
-        // Previous button
-        pages.push(`
-            <li class="page-item ${!pagination.has_prev ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="app.${loadFunction}(${current - 1})">Anterior</a>
-            </li>
-        `);
-
-        // Page numbers
-        for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) {
-            pages.push(`
-                <li class="page-item ${i === current ? 'active' : ''}">
-                    <a class="page-link" href="#" onclick="app.${loadFunction}(${i})">${i}</a>
-                </li>
-            `);
-        }
-
-        // Next button
-        pages.push(`
-            <li class="page-item ${!pagination.has_next ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="app.${loadFunction}(${current + 1})">Próximo</a>
-            </li>
-        `);
-
-        return `
-            <nav aria-label="Paginação">
-                <ul class="pagination justify-content-center">
-                    ${pages.join('')}
-                </ul>
-            </nav>
-        `;
-    }
-
-    async showEmailDetail(emailId) {
+    async viewEmail(emailId) {
         try {
             const email = await this.apiCall(`/api/emails/${emailId}`);
-            
-            // Create modal HTML
-            const modalHtml = `
-                <div class="modal fade" id="emailDetailModal" tabindex="-1">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Detalhes do Email</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <strong>De:</strong> ${email.sender_name} <${email.sender_email}>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <strong>Conta:</strong> <span class="badge bg-primary">${email.account}</span>
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <strong>Assunto:</strong> ${email.subject}
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <strong>Tipo:</strong> 
-                                        <span class="badge bg-${email.classification.type || 'secondary'}">
-                                            ${email.classification.type || 'N/A'}
-                                        </span>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <strong>Prioridade:</strong> 
-                                        <span class="badge bg-${email.classification.priority || 'secondary'}">
-                                            ${email.classification.priority || 'N/A'}
-                                        </span>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <strong>Status:</strong> 
-                                        <span class="badge bg-${this.getStatusColor(email.status)}">${email.status}</span>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <strong>Conteúdo:</strong>
-                                    <div class="email-body mt-2">${email.body_text}</div>
-                                </div>
-                                ${email.responses.length > 0 ? `
-                                    <div class="mb-3">
-                                        <strong>Respostas (${email.responses.length}):</strong>
-                                        ${email.responses.map(response => `
-                                            <div class="card mt-2">
-                                                <div class="card-body">
-                                                    <div class="d-flex justify-content-between">
-                                                        <h6 class="card-title">${response.subject}</h6>
-                                                        <span class="badge bg-${this.getStatusColor(response.status)}">${response.status}</span>
-                                                    </div>
-                                                    <p class="card-text">${response.body_text.substring(0, 200)}...</p>
-                                                    <small class="text-muted">
-                                                        Confiança: ${Math.round(response.generation_confidence * 100)}% | 
-                                                        Criado: ${new Date(response.created_at).toLocaleString('pt-BR')}
-                                                    </small>
-                                                </div>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                ` : ''}
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                                <button type="button" class="btn btn-success" onclick="app.generateResponse(${email.id})">
-                                    <i class="fas fa-reply me-1"></i>Gerar Resposta
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // Remove existing modal
-            const existingModal = document.getElementById('emailDetailModal');
-            if (existingModal) {
-                existingModal.remove();
-            }
-
-            // Add modal to body
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('emailDetailModal'));
-            modal.show();
-
+            this.showEmailModal(email);
         } catch (error) {
-            console.error('Error loading email detail:', error);
-            this.showAlert('Erro ao carregar detalhes do email', 'danger');
+            console.error('Error loading email:', error);
+            this.showError('Erro ao carregar email');
         }
     }
 
-    async showResponseGenerationModal(emailId) {
-        try {
-            const email = await this.apiCall(`/api/emails/${emailId}`);
+    showEmailModal(email) {
+        const modal = document.getElementById('emailModal');
+        if (modal) {
+            document.getElementById('modalEmailSubject').textContent = email.subject;
+            document.getElementById('modalEmailFrom').textContent = `${email.sender_name} <${email.sender_email}>`;
+            document.getElementById('modalEmailDate').textContent = this.formatDate(email.received_at);
+            document.getElementById('modalEmailBody').innerHTML = email.body_html || email.body_text;
             
-            const modalHtml = `
-                <div class="modal fade" id="responseGenerationModal" tabindex="-1">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Gerar Resposta - Controle Manual</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle me-2"></i>
-                                    <strong>Controle Manual Ativo:</strong> Você está escolhendo manualmente quais emails recebem respostas automáticas.
-                                    Foque em leads e alunos, evitando spam e emails comerciais.
-                                </div>
-                                
-                                <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <h6>Email Selecionado:</h6>
-                                        <div class="card">
-                                            <div class="card-body">
-                                                <strong>De:</strong> ${email.sender_name} <${email.sender_email}><br>
-                                                <strong>Assunto:</strong> ${email.subject}<br>
-                                                <strong>Classificação:</strong> 
-                                                <span class="badge bg-${email.classification.type || 'secondary'}">${email.classification.type || 'N/A'}</span>
-                                                <span class="badge bg-${email.classification.priority || 'secondary'}">${email.classification.priority || 'N/A'}</span><br>
-                                                <strong>Confiança:</strong> ${Math.round((email.classification.confidence || 0) * 100)}%
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <label class="form-label">Instruções Personalizadas (Opcional)</label>
-                                        <textarea class="form-control" id="customInstructions" rows="3" 
-                                                  placeholder="Ex: Mencionar promoção especial, incluir link específico, tom mais formal, etc."></textarea>
-                                        <small class="form-text text-muted">
-                                            Adicione instruções específicas para personalizar a resposta gerada pela IA.
-                                        </small>
-                                    </div>
-                                </div>
-                                
-                                <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <label class="form-label">Template (Opcional)</label>
-                                        <select class="form-select" id="templateSelect">
-                                            <option value="">Sem template específico</option>
-                                            <option value="1">Resposta Padrão</option>
-                                            <option value="2">Confirmação de Pagamento</option>
-                                            <option value="3">Informações sobre Cursos</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <div class="alert alert-warning">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>
-                                    <strong>Lembre-se:</strong> A resposta será gerada como rascunho e precisará ser aprovada antes do envio.
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                <button type="button" class="btn btn-success" onclick="app.generateResponse(${emailId})">
-                                    <i class="fas fa-magic me-1"></i>Gerar Resposta
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            const existingModal = document.getElementById('responseGenerationModal');
-            if (existingModal) existingModal.remove();
-
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-            const modal = new bootstrap.Modal(document.getElementById('responseGenerationModal'));
-            modal.show();
-
-        } catch (error) {
-            console.error('Error showing response generation modal:', error);
-            this.showAlert('Erro ao carregar modal de geração de resposta', 'danger');
+            // Show modal (assuming Bootstrap modal)
+            $(modal).modal('show');
         }
     }
 
     async generateResponse(emailId) {
         try {
             this.showLoading();
+            const email = await this.apiCall(`/api/emails/${emailId}`);
+            this.showResponseModal(email);
+        } catch (error) {
+            console.error('Error loading email for response:', error);
+            this.showError('Erro ao carregar email');
+        }
+    }
+
+    showResponseModal(email) {
+        const modal = document.getElementById('responseModal');
+        if (modal) {
+            document.getElementById('responseEmailId').value = email.id;
+            document.getElementById('responseEmailSubject').textContent = email.subject;
+            document.getElementById('responseEmailFrom').textContent = `${email.sender_name} <${email.sender_email}>`;
             
-            // Get custom instructions and template from modal
-            const customInstructions = document.getElementById('customInstructions')?.value || '';
-            const templateId = document.getElementById('templateSelect')?.value || null;
+            // Clear previous response
+            document.getElementById('responseContent').value = '';
             
-            const requestData = {};
-            if (customInstructions) {
-                requestData.custom_instructions = customInstructions;
-            }
-            if (templateId) {
-                requestData.template_id = parseInt(templateId);
-            }
+            // Show modal
+            $(modal).modal('show');
+        }
+    }
+
+    async sendResponse(emailId, responseData) {
+        try {
+            this.showLoading();
             
+            const requestData = {
+                response_text: responseData.content,
+                template_id: responseData.template_id || null,
+                send_immediately: responseData.send_immediately || false
+            };
+
             const response = await this.apiCall(`/api/emails/${emailId}/responses`, 'POST', requestData);
             
-            this.showAlert(response.message || 'Resposta gerada com sucesso!', 'success');
+            this.showSuccess('Resposta gerada com sucesso!');
+            this.loadCurrentSection(); // Refresh current view
             
             // Close modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('responseGenerationModal'));
-            if (modal) modal.hide();
+            $('#responseModal').modal('hide');
             
-            // Refresh current view
-            if (this.currentSection === 'emails') {
-                this.loadEmails();
-            }
-
+            return response;
         } catch (error) {
-            console.error('Error generating response:', error);
-            const errorMessage = error.message || 'Erro ao gerar resposta';
-            this.showAlert(errorMessage, 'danger');
-        } finally {
-            this.hideLoading();
+            console.error('Error sending response:', error);
+            this.showError('Erro ao enviar resposta');
         }
     }
 
     async markForResponse(emailId) {
         try {
             const response = await this.apiCall(`/api/emails/${emailId}/mark-for-response`, 'POST');
-            
-            this.showAlert(response.message || 'Email marcado para geração de resposta', 'success');
-            
-            // Refresh current view
-            if (this.currentSection === 'emails') {
-                this.loadEmails();
-            }
-
+            this.showSuccess('Email marcado para resposta');
+            this.loadCurrentSection();
+            return response;
         } catch (error) {
             console.error('Error marking email for response:', error);
-            this.showAlert('Erro ao marcar email para resposta', 'danger');
+            this.showError('Erro ao marcar email');
         }
     }
 
-    async skipResponse(emailId) {
+    async skipResponse(emailId, reason = '') {
         try {
-            // Show confirmation dialog
-            if (!confirm('Tem certeza que este email não precisa de resposta?')) {
+            const response = await this.apiCall(`/api/emails/${emailId}/skip-response`, 'POST', {
+                reason: reason
+            });
+            this.showSuccess('Email marcado como ignorado');
+            this.loadCurrentSection();
+            return response;
+        } catch (error) {
+            console.error('Error skipping email:', error);
+            this.showError('Erro ao ignorar email');
+        }
+    }
+
+    async performBulkAction() {
+        try {
+            const selectedEmails = this.getSelectedEmails();
+            const action = document.getElementById('bulkActionSelect').value;
+            
+            if (selectedEmails.length === 0) {
+                this.showError('Selecione pelo menos um email');
                 return;
             }
-            
-            const response = await this.apiCall(`/api/emails/${emailId}/skip-response`, 'POST', {
-                reason: 'Manual decision - not suitable for response'
-            });
-            
-            this.showAlert(response.message || 'Email marcado como não necessitando resposta', 'info');
-            
-            // Refresh current view
-            if (this.currentSection === 'emails') {
-                this.loadEmails();
-            }
 
-        } catch (error) {
-            console.error('Error skipping email response:', error);
-            this.showAlert('Erro ao marcar email como não necessitando resposta', 'danger');
-        }
-    }
-
-    async bulkEmailActions(action, emailIds) {
-        try {
-            this.showLoading();
-            
             const response = await this.apiCall('/api/emails/bulk-actions', 'POST', {
-                action: action,
-                email_ids: emailIds
+                email_ids: selectedEmails,
+                action: action
             });
-            
-            this.showAlert(`Ação em lote concluída: ${response.processed} emails processados`, 'success');
-            
-            // Refresh current view
-            if (this.currentSection === 'emails') {
-                this.loadEmails();
-            }
 
+            this.showSuccess(`Ação executada em ${selectedEmails.length} emails`);
+            this.loadCurrentSection();
+            
+            return response;
         } catch (error) {
-            console.error('Error in bulk actions:', error);
-            this.showAlert('Erro ao executar ação em lote', 'danger');
-        } finally {
-            this.hideLoading();
+            console.error('Error performing bulk action:', error);
+            this.showError('Erro ao executar ação em lote');
         }
     }
 
     async processEmails() {
         try {
             this.showLoading();
-            
             const result = await this.apiCall('/api/emails/process', 'POST');
             
-            this.showAlert(`Processamento concluído! ${JSON.stringify(result.results)}`, 'success');
+            this.showSuccess(`Processamento iniciado! ${result.processed_count || 0} emails processados`);
             
-            // Refresh dashboard
-            if (this.currentSection === 'dashboard') {
+            // Refresh dashboard after processing
+            setTimeout(() => {
                 this.loadDashboard();
-            } else if (this.currentSection === 'emails') {
-                this.loadEmails();
-            }
-
+            }, 2000);
+            
+            return result;
         } catch (error) {
             console.error('Error processing emails:', error);
-            this.showAlert('Erro ao processar emails', 'danger');
-        } finally {
-            this.hideLoading();
+            this.showError('Erro ao processar emails');
         }
     }
 
-    filterEmails() {
-        this.loadEmails(1);
+    getSelectedEmails() {
+        const checkboxes = document.querySelectorAll('.email-checkbox:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
     }
 
-    clearFilters() {
-        document.getElementById('account-filter').value = '';
-        document.getElementById('status-filter').value = '';
-        document.getElementById('type-filter').value = '';
-        document.getElementById('search-input').value = '';
-        this.loadEmails(1);
+    getActiveFilters() {
+        return {
+            status: document.getElementById('statusFilter')?.value,
+            classification: document.getElementById('classificationFilter')?.value,
+            account: document.getElementById('accountFilter')?.value,
+            date_from: document.getElementById('dateFromFilter')?.value,
+            date_to: document.getElementById('dateToFilter')?.value,
+            search: document.getElementById('searchInput')?.value
+        };
     }
 
     async loadResponses() {
         try {
-            this.showLoading();
+            this.showLoading('responsesContent');
             
             const params = new URLSearchParams({
-                page: 1,
-                per_page: 20
+                page: this.currentPage,
+                per_page: this.itemsPerPage
             });
 
-            // Add filters if they exist
-            const statusFilter = document.getElementById('response-status-filter');
-            const accountFilter = document.getElementById('response-account-filter');
-            
-            if (statusFilter && statusFilter.value) {
-                params.append('status', statusFilter.value);
-            }
-            if (accountFilter && accountFilter.value) {
-                params.append('account', accountFilter.value);
-            }
-
             const data = await this.apiCall(`/api/responses?${params}`);
-            this.displayResponsesTable(data);
-
+            this.renderResponses(data);
         } catch (error) {
             console.error('Error loading responses:', error);
-            this.showAlert('Erro ao carregar respostas', 'danger');
-        } finally {
-            this.hideLoading();
+            this.showError('Erro ao carregar respostas');
         }
     }
 
-    displayResponsesTable(data) {
-        const responsesSection = document.getElementById('responses-section');
-        if (!responsesSection) return;
+    renderResponses(data) {
+        const container = document.getElementById('responsesContent');
+        if (!container) return;
 
-        const responses = data.responses || [];
-        const pagination = data.pagination || {};
+        if (!data || !data.responses || data.responses.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-reply fa-3x text-muted mb-3"></i>
+                    <h5>Nenhuma resposta encontrada</h5>
+                    <p class="text-muted">Não há respostas para exibir no momento.</p>
+                </div>
+            `;
+            return;
+        }
 
-        responsesSection.innerHTML = `
-            <h2>Gerenciamento de Respostas</h2>
-            
-            <div class="row mb-4">
-                <div class="col-md-3">
-                    <select class="form-select" id="response-status-filter">
-                        <option value="">Todos os status</option>
-                        <option value="draft">Rascunho</option>
-                        <option value="approved">Aprovado</option>
-                        <option value="sent">Enviado</option>
-                        <option value="rejected">Rejeitado</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <select class="form-select" id="response-account-filter">
-                        <option value="">Todas as contas</option>
-                        <option value="contato">contato</option>
-                        <option value="cursos">cursos</option>
-                        <option value="diogo">diogo</option>
-                        <option value="sac">sac</option>
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <button class="btn btn-primary" onclick="app.loadResponses()">
-                        <i class="fas fa-sync me-1"></i>Atualizar
-                    </button>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Email Original</th>
-                                    <th>Assunto da Resposta</th>
-                                    <th>Status</th>
-                                    <th>Confiança</th>
-                                    <th>Criado</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${responses.map(response => `
-                                    <tr>
-                                        <td>#${response.id}</td>
-                                        <td>
-                                            <div class="fw-bold">${response.email.sender_name || response.email.sender_email}</div>
-                                            <small class="text-muted">${response.email.subject}</small><br>
-                                            <span class="badge bg-primary">${response.email.account}</span>
-                                        </td>
-                                        <td>
-                                            <div class="text-truncate" style="max-width: 200px;" title="${response.subject}">
-                                                ${response.subject}
-                                            </div>
-                                            <small class="text-muted">${response.body_preview}</small>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-${this.getStatusColor(response.status)}">${response.status}</span>
-                                        </td>
-                                        <td>
-                                            <div class="confidence-bar" style="width: 60px;">
-                                                <div class="confidence-fill confidence-${this.getConfidenceLevel(response.generation_confidence)}" 
-                                                     style="width: ${(response.generation_confidence * 100)}%"></div>
-                                            </div>
-                                            <small>${Math.round(response.generation_confidence * 100)}%</small>
-                                        </td>
-                                        <td>
-                                            <small>${new Date(response.created_at).toLocaleDateString('pt-BR')}</small><br>
-                                            <small class="text-muted">${new Date(response.created_at).toLocaleTimeString('pt-BR')}</small>
-                                        </td>
-                                        <td>
-                                            <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-outline-primary" onclick="app.showResponseDetail(${response.id})">
-                                                    <i class="fas fa-eye"></i>
-                                                </button>
-                                                ${response.status === 'draft' ? `
-                                                    <button class="btn btn-outline-success" onclick="app.approveResponse(${response.id})">
-                                                        <i class="fas fa-check"></i>
-                                                    </button>
-                                                ` : ''}
-                                                ${response.status === 'approved' ? `
-                                                    <button class="btn btn-outline-info" onclick="app.sendResponse(${response.id})">
-                                                        <i class="fas fa-paper-plane"></i>
-                                                    </button>
-                                                ` : ''}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+        const responsesHtml = data.responses.map(response => `
+            <div class="response-item" data-response-id="${response.id}">
+                <div class="response-header">
+                    <div class="response-email">
+                        <strong>Para: ${response.email.sender_name}</strong>
+                        <span class="text-muted"><${response.email.sender_email}></span>
                     </div>
-                    ${this.createPagination(pagination, 'loadResponses')}
+                    <div class="response-date">${this.formatDate(response.created_at)}</div>
+                </div>
+                <div class="response-subject">
+                    <h6>Re: ${response.email.subject}</h6>
+                </div>
+                <div class="response-preview">
+                    ${response.response_text.substring(0, 200)}...
+                </div>
+                <div class="response-footer">
+                    <div class="response-status">
+                        <span class="badge badge-${this.getResponseStatusColor(response.status)}">${this.getResponseStatusText(response.status)}</span>
+                        ${response.template ? `<span class="badge badge-info">${response.template.name}</span>` : ''}
+                    </div>
+                    <div class="response-actions">
+                        <button class="btn btn-sm btn-outline-primary" onclick="dashboard.viewResponse('${response.id}')">
+                            <i class="fas fa-eye"></i> Ver
+                        </button>
+                        ${response.status === 'pending' ? `
+                            <button class="btn btn-sm btn-outline-success" onclick="dashboard.approveResponse('${response.id}')">
+                                <i class="fas fa-check"></i> Aprovar
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning" onclick="dashboard.editResponse('${response.id}')">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                        ` : ''}
+                        ${response.status === 'approved' ? `
+                            <button class="btn btn-sm btn-outline-primary" onclick="dashboard.sendResponse('${response.id}')">
+                                <i class="fas fa-paper-plane"></i> Enviar
+                            </button>
+                        ` : ''}
+                    </div>
                 </div>
             </div>
-        `;
+        `).join('');
 
-        // Add event listeners for filters
-        document.getElementById('response-status-filter').addEventListener('change', () => this.loadResponses());
-        document.getElementById('response-account-filter').addEventListener('change', () => this.loadResponses());
+        container.innerHTML = responsesHtml;
+        this.updatePagination(data.pagination);
     }
 
     async loadTemplates() {
         try {
-            this.showLoading();
+            this.showLoading('templatesContent');
             
             const params = new URLSearchParams({
-                page: 1,
-                per_page: 20
+                page: this.currentPage,
+                per_page: this.itemsPerPage
             });
 
             const data = await this.apiCall(`/api/templates?${params}`);
-            this.displayTemplatesTable(data);
-
+            this.renderTemplates(data);
         } catch (error) {
             console.error('Error loading templates:', error);
-            this.showAlert('Erro ao carregar templates', 'danger');
-        } finally {
-            this.hideLoading();
+            this.showError('Erro ao carregar templates');
         }
     }
 
-    displayTemplatesTable(data) {
-        const templatesSection = document.getElementById('templates-section');
-        if (!templatesSection) return;
+    renderTemplates(data) {
+        const container = document.getElementById('templatesContent');
+        if (!container) return;
 
-        const templates = data.templates || [];
-        const pagination = data.pagination || {};
-
-        templatesSection.innerHTML = `
-            <h2>Gerenciamento de Templates</h2>
-            
-            <div class="row mb-4">
-                <div class="col-md-6">
-                    <button class="btn btn-success" onclick="app.showCreateTemplateModal()">
-                        <i class="fas fa-plus me-1"></i>Novo Template
-                    </button>
-                    <button class="btn btn-primary ms-2" onclick="app.loadTemplates()">
-                        <i class="fas fa-sync me-1"></i>Atualizar
+        if (!data || !data.templates || data.templates.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                    <h5>Nenhum template encontrado</h5>
+                    <p class="text-muted">Não há templates para exibir no momento.</p>
+                    <button class="btn btn-primary" onclick="dashboard.showCreateTemplateModal()">
+                        <i class="fas fa-plus"></i> Criar Template
                     </button>
                 </div>
-                <div class="col-md-6">
-                    <div class="input-group">
-                        <input type="text" class="form-control" id="template-search" placeholder="Buscar templates...">
-                        <button class="btn btn-outline-secondary" onclick="app.searchTemplates()">
-                            <i class="fas fa-search"></i>
+            `;
+            return;
+        }
+
+        const templatesHtml = data.templates.map(template => `
+            <div class="template-item" data-template-id="${template.id}">
+                <div class="template-header">
+                    <div class="template-name">
+                        <strong>${template.name}</strong>
+                        <span class="badge badge-${template.is_active ? 'success' : 'secondary'}">
+                            ${template.is_active ? 'Ativo' : 'Inativo'}
+                        </span>
+                    </div>
+                    <div class="template-category">
+                        <span class="badge badge-info">${template.category}</span>
+                    </div>
+                </div>
+                <div class="template-description">
+                    ${template.description || 'Sem descrição'}
+                </div>
+                <div class="template-preview">
+                    ${template.content.substring(0, 150)}...
+                </div>
+                <div class="template-footer">
+                    <div class="template-stats">
+                        <small class="text-muted">Usado ${template.usage_count || 0} vezes</small>
+                    </div>
+                    <div class="template-actions">
+                        <button class="btn btn-sm btn-outline-primary" onclick="dashboard.viewTemplate('${template.id}')">
+                            <i class="fas fa-eye"></i> Ver
+                        </button>
+                        <button class="btn btn-sm btn-outline-warning" onclick="dashboard.editTemplate('${template.id}')">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                        <button class="btn btn-sm btn-outline-${template.is_active ? 'secondary' : 'success'}" onclick="dashboard.toggleTemplate('${template.id}')">
+                            <i class="fas fa-${template.is_active ? 'pause' : 'play'}"></i> ${template.is_active ? 'Desativar' : 'Ativar'}
                         </button>
                     </div>
                 </div>
             </div>
+        `).join('');
 
-            <div class="card">
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Nome</th>
-                                    <th>Categoria</th>
-                                    <th>Descrição</th>
-                                    <th>Uso</th>
-                                    <th>Status</th>
-                                    <th>Atualizado</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${templates.map(template => `
-                                    <tr>
-                                        <td>
-                                            <div class="fw-bold">${template.name}</div>
-                                            <small class="text-muted">${template.subject_template}</small>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-secondary">${template.category}</span>
-                                        </td>
-                                        <td>
-                                            <div class="text-truncate" style="max-width: 200px;" title="${template.description}">
-                                                ${template.description || 'Sem descrição'}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-info">${template.usage_count} usos</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-${template.is_active ? 'success' : 'secondary'}">
-                                                ${template.is_active ? 'Ativo' : 'Inativo'}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <small>${new Date(template.updated_at || template.created_at).toLocaleDateString('pt-BR')}</small>
-                                        </td>
-                                        <td>
-                                            <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-outline-primary" onclick="app.showTemplateDetail(${template.id})">
-                                                    <i class="fas fa-eye"></i>
-                                                </button>
-                                                <button class="btn btn-outline-warning" onclick="app.editTemplate(${template.id})">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <button class="btn btn-outline-${template.is_active ? 'secondary' : 'success'}" 
-                                                        onclick="app.toggleTemplate(${template.id})">
-                                                    <i class="fas fa-${template.is_active ? 'pause' : 'play'}"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                    ${this.createPagination(pagination, 'loadTemplates')}
-                </div>
-            </div>
-        `;
+        container.innerHTML = templatesHtml;
+        this.updatePagination(data.pagination);
     }
 
     async loadAdmin() {
         try {
+            this.showLoading('adminContent');
+            
             // Load Gmail accounts status
             const accountsStatus = await this.apiCall('/api/admin/gmail-accounts/status');
-            this.displayGmailAccountsStatus(accountsStatus);
-
+            
             // Load system settings
             const settings = await this.apiCall('/api/admin/settings');
-            this.displaySystemSettings(settings);
-
+            
+            this.renderAdmin(accountsStatus, settings);
         } catch (error) {
             console.error('Error loading admin:', error);
-            this.showAlert('Erro ao carregar seção de administração', 'danger');
+            this.showError('Erro ao carregar administração');
         }
     }
 
-    displayGmailAccountsStatus(data) {
-        const adminSection = document.getElementById('admin-section');
-        if (!adminSection) return;
+    renderAdmin(accountsStatus, settings) {
+        const container = document.getElementById('adminContent');
+        if (!container) return;
 
-        const accountsHtml = `
-            <h2>Administração</h2>
-            <div class="row mb-4">
-                <div class="col-12">
-                    <h3>Contas Gmail</h3>
+        const adminHtml = `
+            <div class="row">
+                <div class="col-md-6">
                     <div class="card">
+                        <div class="card-header">
+                            <h5>Contas Gmail</h5>
+                        </div>
                         <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Nome</th>
-                                            <th>Email</th>
-                                            <th>Status</th>
-                                            <th>Emails</th>
-                                            <th>Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${data.accounts.map(account => `
-                                            <tr>
-                                                <td><strong>${account.name}</strong></td>
-                                                <td>${account.email}</td>
-                                                <td>
-                                                    <span class="badge bg-${account.is_authenticated ? 'success' : 'danger'}">
-                                                        ${account.is_authenticated ? 'Autenticado' : 'Não Autenticado'}
-                                                    </span>
-                                                </td>
-                                                <td>${account.email_count}</td>
-                                                <td>
-                                                    ${!account.is_authenticated ? `
-                                                        <button class="btn btn-primary btn-sm" onclick="app.authenticateGmailAccount('${account.name}')">
-                                                            <i class="fas fa-key me-1"></i>Autenticar
-                                                        </button>
-                                                    ` : `
-                                                        <button class="btn btn-success btn-sm" disabled>
-                                                            <i class="fas fa-check me-1"></i>Conectado
-                                                        </button>
-                                                        <button class="btn btn-outline-warning btn-sm ms-1" onclick="app.refreshGmailToken('${account.name}')">
-                                                            <i class="fas fa-sync me-1"></i>Renovar
-                                                        </button>
-                                                    `}
-                                                </td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
+                            ${this.renderGmailAccounts(accountsStatus)}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Configurações do Sistema</h5>
+                        </div>
+                        <div class="card-body">
+                            ${this.renderSystemSettings(settings)}
                         </div>
                     </div>
                 </div>
             </div>
         `;
 
-        // Replace admin section content
-        adminSection.innerHTML = accountsHtml;
+        container.innerHTML = adminHtml;
     }
 
-    displaySystemSettings(settings) {
-        const adminSection = document.getElementById('admin-section');
-        if (!adminSection) return;
+    renderGmailAccounts(accounts) {
+        if (!accounts || accounts.length === 0) {
+            return '<p class="text-muted">Nenhuma conta configurada</p>';
+        }
 
-        const settingsHtml = `
-            <div class="row mb-4">
-                <div class="col-12">
-                    <h3>Configurações do Sistema</h3>
-                    <div class="card">
-                        <div class="card-body">
-                            <form id="system-settings-form">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Intervalo de Verificação (segundos)</label>
-                                            <input type="number" class="form-control" name="email_check_interval" 
-                                                   value="${settings.settings?.email_check_interval?.value || 300}">
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Máximo de Emails por Lote</label>
-                                            <input type="number" class="form-control" name="max_emails_per_batch" 
-                                                   value="${settings.settings?.max_emails_per_batch?.value || 50}">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Limite de Confiança para Classificação</label>
-                                            <input type="number" class="form-control" name="classification_threshold" 
-                                                   step="0.1" min="0" max="1" value="${settings.settings?.classification_threshold?.value || 0.7}">
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Limite para Resposta Automática</label>
-                                            <input type="number" class="form-control" name="auto_response_threshold" 
-                                                   step="0.1" min="0" max="1" value="${settings.settings?.auto_response_threshold?.value || 0.85}">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-12">
-                                        <button type="submit" class="btn btn-primary">
-                                            <i class="fas fa-save me-1"></i>Salvar Configurações
-                                        </button>
-                                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="app.testAIService()">
-                                            <i class="fas fa-flask me-1"></i>Testar IA
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
+        return accounts.map(account => `
+            <div class="gmail-account-item mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${account.email}</strong>
+                        <br>
+                        <span class="badge badge-${account.status === 'active' ? 'success' : 'danger'}">
+                            ${account.status === 'active' ? 'Ativa' : 'Inativa'}
+                        </span>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="dashboard.authenticateGmail('${account.email}')">
+                            <i class="fas fa-key"></i> Autenticar
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="dashboard.refreshGmail('${account.email}')">
+                            <i class="fas fa-sync"></i> Atualizar
+                        </button>
                     </div>
                 </div>
             </div>
-        `;
-
-        adminSection.innerHTML += settingsHtml;
-
-        // Add form submit handler
-        document.getElementById('system-settings-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.saveSystemSettings(new FormData(e.target));
-        });
+        `).join('');
     }
 
-    async authenticateGmailAccount(accountName) {
+    renderSystemSettings(settings) {
+        return `
+            <form id="systemSettingsForm">
+                <div class="form-group">
+                    <label>Modelo de IA</label>
+                    <select class="form-control" name="ai_model">
+                        <option value="gpt-4" ${settings?.ai_model === 'gpt-4' ? 'selected' : ''}>GPT-4</option>
+                        <option value="gpt-3.5-turbo" ${settings?.ai_model === 'gpt-3.5-turbo' ? 'selected' : ''}>GPT-3.5 Turbo</option>
+                        <option value="claude-3" ${settings?.ai_model === 'claude-3' ? 'selected' : ''}>Claude 3</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Intervalo de Verificação (minutos)</label>
+                    <input type="number" class="form-control" name="check_interval" value="${settings?.check_interval || 5}" min="1" max="60">
+                </div>
+                <div class="form-group">
+                    <label>Limite de Confiança para Auto-resposta</label>
+                    <input type="number" class="form-control" name="auto_response_threshold" value="${settings?.auto_response_threshold || 0.85}" min="0" max="1" step="0.01">
+                </div>
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" name="auto_processing" ${settings?.auto_processing ? 'checked' : ''}>
+                        <label class="form-check-label">Processamento Automático</label>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="dashboard.saveSettings()">
+                    <i class="fas fa-save"></i> Salvar Configurações
+                </button>
+                <button type="button" class="btn btn-outline-info ml-2" onclick="dashboard.testAI()">
+                    <i class="fas fa-flask"></i> Testar IA
+                </button>
+            </form>
+        `;
+    }
+
+    async authenticateGmail(email) {
         try {
-            this.showLoading();
-            
             const result = await this.apiCall('/api/admin/gmail-accounts/authenticate', 'POST', {
-                account_name: accountName
+                email: email
             });
-
+            
             if (result.auth_url) {
-                // Store current location to return after auth
-                sessionStorage.setItem('gmail_auth_return', window.location.href);
-                sessionStorage.setItem('gmail_auth_account', accountName);
-                
-                // Redirect directly to authentication URL
-                window.location.href = result.auth_url;
-            } else {
-                this.showAlert('Erro ao iniciar autenticação', 'danger');
+                // Open authentication URL in new window
+                window.open(result.auth_url, 'gmail_auth', 'width=600,height=600');
+                this.showInfo('Complete a autenticação na nova janela');
             }
-
         } catch (error) {
-            console.error('Error authenticating Gmail account:', error);
-            this.showAlert(`Erro ao autenticar conta ${accountName}`, 'danger');
-        } finally {
-            this.hideLoading();
+            console.error('Error authenticating Gmail:', error);
+            this.showError('Erro ao autenticar Gmail');
         }
     }
 
-    async refreshGmailToken(accountName) {
+    async refreshGmail(email) {
         try {
-            this.showLoading();
-            
             await this.apiCall('/api/admin/gmail-accounts/refresh', 'POST', {
-                account_name: accountName
+                email: email
             });
-
-            this.showAlert(`Token renovado para ${accountName}`, 'success');
-            this.loadAdmin(); // Refresh admin section
-
+            
+            this.showSuccess('Conta Gmail atualizada');
+            this.loadAdmin();
         } catch (error) {
-            console.error('Error refreshing Gmail token:', error);
-            this.showAlert(`Erro ao renovar token para ${accountName}`, 'danger');
-        } finally {
-            this.hideLoading();
+            console.error('Error refreshing Gmail:', error);
+            this.showError('Erro ao atualizar Gmail');
         }
     }
 
-    async saveSystemSettings(formData) {
+    async saveSettings() {
         try {
-            this.showLoading();
+            const form = document.getElementById('systemSettingsForm');
+            const formData = new FormData(form);
+            const settings = Object.fromEntries(formData.entries());
             
-            const settings = {};
-            for (let [key, value] of formData.entries()) {
-                settings[key] = isNaN(value) ? value : Number(value);
-            }
-
+            // Convert checkbox to boolean
+            settings.auto_processing = formData.has('auto_processing');
+            
             await this.apiCall('/api/admin/settings', 'POST', settings);
-            
-            this.showAlert('Configurações salvas com sucesso!', 'success');
-
+            this.showSuccess('Configurações salvas com sucesso');
         } catch (error) {
             console.error('Error saving settings:', error);
-            this.showAlert('Erro ao salvar configurações', 'danger');
-        } finally {
-            this.hideLoading();
+            this.showError('Erro ao salvar configurações');
         }
     }
 
-    async testAIService() {
+    async testAI() {
         try {
-            this.showLoading();
-            
             const result = await this.apiCall('/api/admin/test-ai', 'POST', {
-                test_message: 'Teste de conectividade com o serviço de IA'
+                test_message: 'Este é um teste de conectividade com a IA'
             });
-
-            this.showAlert(`Teste de IA concluído: ${result.status}`, result.success ? 'success' : 'warning');
-
+            
+            this.showSuccess('Teste de IA realizado com sucesso');
+            console.log('AI Test Result:', result);
         } catch (error) {
-            console.error('Error testing AI service:', error);
-            this.showAlert('Erro ao testar serviço de IA', 'danger');
-        } finally {
-            this.hideLoading();
+            console.error('Error testing AI:', error);
+            this.showError('Erro ao testar IA');
         }
     }
 
     // Utility methods
     async apiCall(url, method = 'GET', data = null) {
         // Use same protocol as current page (HTTPS in production)
-        const protocol = window.location.protocol;
-        const baseUrl = `${protocol}//${window.location.host}`;
-        
+        const protocol = "https:";
+        const baseUrl = "https://" + window.location.host;
+
         const fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : url;
-        
+
         const options = {
-            method,
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             }
         };
 
-        if (data) {
+        if (data && method !== 'GET') {
             options.body = JSON.stringify(data);
         }
 
@@ -1274,11 +829,113 @@ class GmailAIAgent {
         return await response.json();
     }
 
-    updateElement(id, value) {
-        const element = document.getElementById(id);
-        if (element) {
-            element.textContent = value;
+    async viewResponse(responseId) {
+        try {
+            const response = await this.apiCall(`/api/responses/${responseId}`);
+            this.showResponseViewModal(response);
+        } catch (error) {
+            console.error('Error loading response:', error);
+            this.showError('Erro ao carregar resposta');
         }
+    }
+
+    showResponseViewModal(response) {
+        const modal = document.getElementById('responseViewModal');
+        if (modal) {
+            document.getElementById('responseViewSubject').textContent = `Re: ${response.email.subject}`;
+            document.getElementById('responseViewTo').textContent = `${response.email.sender_name} <${response.email.sender_email}>`;
+            document.getElementById('responseViewDate').textContent = this.formatDate(response.created_at);
+            document.getElementById('responseViewContent').innerHTML = response.response_text;
+            
+            $(modal).modal('show');
+        }
+    }
+
+    async approveResponse(responseId) {
+        try {
+            await this.apiCall(`/api/responses/${responseId}/approve`, 'POST', {
+                approved: true
+            });
+            this.showSuccess('Resposta aprovada');
+            this.loadCurrentSection();
+        } catch (error) {
+            console.error('Error approving response:', error);
+            this.showError('Erro ao aprovar resposta');
+        }
+    }
+
+    async sendResponse(responseId) {
+        try {
+            await this.apiCall(`/api/responses/${responseId}/send`, 'POST');
+            this.showSuccess('Resposta enviada');
+            this.loadCurrentSection();
+        } catch (error) {
+            console.error('Error sending response:', error);
+            this.showError('Erro ao enviar resposta');
+        }
+    }
+
+    async viewTemplate(templateId) {
+        try {
+            const template = await this.apiCall(`/api/templates/${templateId}`);
+            this.showTemplateModal(template);
+        } catch (error) {
+            console.error('Error loading template:', error);
+            this.showError('Erro ao carregar template');
+        }
+    }
+
+    showTemplateModal(template) {
+        const modal = document.getElementById('templateModal');
+        if (modal) {
+            document.getElementById('templateModalName').textContent = template.name;
+            document.getElementById('templateModalCategory').textContent = template.category;
+            document.getElementById('templateModalDescription').textContent = template.description || 'Sem descrição';
+            document.getElementById('templateModalContent').innerHTML = template.content;
+            
+            $(modal).modal('show');
+        }
+    }
+
+    async toggleTemplate(templateId) {
+        try {
+            await this.apiCall(`/api/templates/${templateId}/toggle`, 'POST');
+            this.showSuccess('Status do template alterado');
+            this.loadCurrentSection();
+        } catch (error) {
+            console.error('Error toggling template:', error);
+            this.showError('Erro ao alterar template');
+        }
+    }
+
+    // Helper methods
+    formatDate(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleString('pt-BR');
+    }
+
+    formatTime(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diff = now - date;
+        
+        if (diff < 60000) return 'Agora mesmo';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)} min atrás`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h atrás`;
+        return date.toLocaleDateString('pt-BR');
+    }
+
+    getActivityIcon(type) {
+        const icons = {
+            'email_received': 'envelope',
+            'response_generated': 'reply',
+            'response_sent': 'paper-plane',
+            'classification': 'tags',
+            'error': 'exclamation-triangle'
+        };
+        return icons[type] || 'info-circle';
     }
 
     getStatusColor(status) {
@@ -1286,287 +943,174 @@ class GmailAIAgent {
             'pending': 'warning',
             'processed': 'info',
             'responded': 'success',
-            'draft': 'warning',
-            'approved': 'info',
-            'sent': 'success'
+            'ignored': 'secondary',
+            'error': 'danger'
         };
         return colors[status] || 'secondary';
     }
 
-    getConfidenceLevel(confidence) {
-        if (confidence >= 0.8) return 'high';
-        if (confidence >= 0.5) return 'medium';
-        return 'low';
+    getStatusText(status) {
+        const texts = {
+            'pending': 'Pendente',
+            'processed': 'Processado',
+            'responded': 'Respondido',
+            'ignored': 'Ignorado',
+            'error': 'Erro'
+        };
+        return texts[status] || status;
     }
 
-    showLoading() {
-        const modal = new bootstrap.Modal(document.getElementById('loadingModal'));
-        modal.show();
+    getResponseStatusColor(status) {
+        const colors = {
+            'pending': 'warning',
+            'approved': 'success',
+            'sent': 'primary',
+            'rejected': 'danger'
+        };
+        return colors[status] || 'secondary';
     }
 
-    hideLoading() {
-        const modal = bootstrap.Modal.getInstance(document.getElementById('loadingModal'));
-        if (modal) {
-            modal.hide();
+    getResponseStatusText(status) {
+        const texts = {
+            'pending': 'Pendente',
+            'approved': 'Aprovada',
+            'sent': 'Enviada',
+            'rejected': 'Rejeitada'
+        };
+        return texts[status] || status;
+    }
+
+    updatePagination(pagination) {
+        const container = document.getElementById('paginationContainer');
+        if (!container || !pagination) return;
+
+        const { current_page, total_pages, has_prev, has_next } = pagination;
+        
+        let paginationHtml = '<nav><ul class="pagination justify-content-center">';
+        
+        // Previous button
+        paginationHtml += `
+            <li class="page-item ${!has_prev ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${current_page - 1}" ${!has_prev ? 'tabindex="-1"' : ''}>
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            </li>
+        `;
+        
+        // Page numbers
+        const startPage = Math.max(1, current_page - 2);
+        const endPage = Math.min(total_pages, current_page + 2);
+        
+        for (let i = startPage; i <= endPage; i++) {
+            paginationHtml += `
+                <li class="page-item ${i === current_page ? 'active' : ''}">
+                    <a class="page-link" href="#" data-page="${i}">${i}</a>
+                </li>
+            `;
+        }
+        
+        // Next button
+        paginationHtml += `
+            <li class="page-item ${!has_next ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${current_page + 1}" ${!has_next ? 'tabindex="-1"' : ''}>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+        `;
+        
+        paginationHtml += '</ul></nav>';
+        container.innerHTML = paginationHtml;
+    }
+
+    showLoading(containerId = null) {
+        const loadingHtml = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Carregando...</span>
+                </div>
+                <p class="mt-2">Carregando...</p>
+            </div>
+        `;
+        
+        if (containerId) {
+            const container = document.getElementById(containerId);
+            if (container) {
+                container.innerHTML = loadingHtml;
+            }
         }
     }
 
+    showError(message) {
+        this.showAlert(message, 'danger');
+    }
+
+    showSuccess(message) {
+        this.showAlert(message, 'success');
+    }
+
+    showInfo(message) {
+        this.showAlert(message, 'info');
+    }
+
     showAlert(message, type = 'info') {
+        const alertContainer = document.getElementById('alertContainer') || document.body;
+        const alertId = 'alert-' + Date.now();
+        
         const alertHtml = `
-            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert">
                 ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                <button type="button" class="close" data-dismiss="alert">
+                    <span>&times;</span>
+                </button>
             </div>
         `;
-
-        const container = document.querySelector('.container-fluid');
-        container.insertAdjacentHTML('afterbegin', alertHtml);
-
+        
+        alertContainer.insertAdjacentHTML('afterbegin', alertHtml);
+        
         // Auto-dismiss after 5 seconds
         setTimeout(() => {
-            const alert = container.querySelector('.alert');
+            const alert = document.getElementById(alertId);
             if (alert) {
-                const bsAlert = new bootstrap.Alert(alert);
-                bsAlert.close();
+                alert.remove();
             }
         }, 5000);
     }
 
     startAutoRefresh() {
         // Refresh dashboard every 5 minutes
-        this.refreshInterval = setInterval(() => {
+        setInterval(() => {
             if (this.currentSection === 'dashboard') {
                 this.loadDashboard();
             }
         }, 300000);
     }
 
-    stopAutoRefresh() {
-        if (this.refreshInterval) {
-            clearInterval(this.refreshInterval);
-        }
+    searchEmails(query) {
+        // Debounce search
+        clearTimeout(this.searchTimeout);
+        this.searchTimeout = setTimeout(() => {
+            this.currentPage = 1;
+            this.loadEmails();
+        }, 500);
     }
 
-    checkAuthReturn() {
-        // Check if user is returning from Gmail authentication
-        const authReturn = sessionStorage.getItem('gmail_auth_return');
-        const authAccount = sessionStorage.getItem('gmail_auth_account');
+    applyFilter(filter) {
+        // Update filter UI
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
         
-        if (authReturn && authAccount) {
-            // Clear session storage
-            sessionStorage.removeItem('gmail_auth_return');
-            sessionStorage.removeItem('gmail_auth_account');
-            
-            // Show success message
-            this.showAlert(`Autenticação da conta ${authAccount} concluída com sucesso!`, 'success');
-            
-            // Navigate to admin section if not already there
-            if (this.currentSection !== 'admin') {
-                this.showSection('admin');
-            } else {
-                // Refresh admin section to show updated status
-                setTimeout(() => this.loadAdmin(), 1000);
-            }
-        }
-    }
-
-    // Response management functions
-    async showResponseDetail(responseId) {
-        try {
-            const response = await this.apiCall(`/api/responses/${responseId}`);
-            
-            const modalHtml = `
-                <div class="modal fade" id="responseDetailModal" tabindex="-1">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Detalhes da Resposta #${response.id}</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <strong>Status:</strong> 
-                                        <span class="badge bg-${this.getStatusColor(response.status)}">${response.status}</span>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <strong>Confiança:</strong> ${Math.round(response.generation_confidence * 100)}%
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-12">
-                                        <strong>Email Original:</strong><br>
-                                        <small>De: ${response.email.sender_name} <${response.email.sender_email}></small><br>
-                                        <small>Assunto: ${response.email.subject}</small>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <strong>Assunto da Resposta:</strong>
-                                    <div class="form-control">${response.subject}</div>
-                                </div>
-                                <div class="mb-3">
-                                    <strong>Conteúdo da Resposta:</strong>
-                                    <div class="form-control" style="height: 200px; overflow-y: auto;">${response.body_text}</div>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                                ${response.status === 'draft' ? `
-                                    <button type="button" class="btn btn-success" onclick="app.approveResponse(${response.id})">
-                                        <i class="fas fa-check me-1"></i>Aprovar
-                                    </button>
-                                ` : ''}
-                                ${response.status === 'approved' ? `
-                                    <button type="button" class="btn btn-info" onclick="app.sendResponse(${response.id})">
-                                        <i class="fas fa-paper-plane me-1"></i>Enviar
-                                    </button>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            const existingModal = document.getElementById('responseDetailModal');
-            if (existingModal) existingModal.remove();
-
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-            const modal = new bootstrap.Modal(document.getElementById('responseDetailModal'));
-            modal.show();
-
-        } catch (error) {
-            console.error('Error loading response detail:', error);
-            this.showAlert('Erro ao carregar detalhes da resposta', 'danger');
-        }
-    }
-
-    async approveResponse(responseId) {
-        try {
-            await this.apiCall(`/api/responses/${responseId}/approve`, 'POST', {
-                approved_by: 'admin'
-            });
-            
-            this.showAlert('Resposta aprovada com sucesso!', 'success');
-            this.loadResponses();
-            
-            // Close modal if open
-            const modal = bootstrap.Modal.getInstance(document.getElementById('responseDetailModal'));
-            if (modal) modal.hide();
-
-        } catch (error) {
-            console.error('Error approving response:', error);
-            this.showAlert('Erro ao aprovar resposta', 'danger');
-        }
-    }
-
-    async sendResponse(responseId) {
-        try {
-            await this.apiCall(`/api/responses/${responseId}/send`, 'POST');
-            
-            this.showAlert('Resposta enviada com sucesso!', 'success');
-            this.loadResponses();
-            
-            // Close modal if open
-            const modal = bootstrap.Modal.getInstance(document.getElementById('responseDetailModal'));
-            if (modal) modal.hide();
-
-        } catch (error) {
-            console.error('Error sending response:', error);
-            this.showAlert('Erro ao enviar resposta', 'danger');
-        }
-    }
-
-    // Template management functions
-    async showTemplateDetail(templateId) {
-        try {
-            const template = await this.apiCall(`/api/templates/${templateId}`);
-            
-            const modalHtml = `
-                <div class="modal fade" id="templateDetailModal" tabindex="-1">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Template: ${template.name}</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <strong>Categoria:</strong> <span class="badge bg-secondary">${template.category}</span>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <strong>Uso:</strong> <span class="badge bg-info">${template.usage_count} vezes</span>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <strong>Descrição:</strong>
-                                    <div>${template.description || 'Sem descrição'}</div>
-                                </div>
-                                <div class="mb-3">
-                                    <strong>Assunto:</strong>
-                                    <div class="form-control">${template.subject_template}</div>
-                                </div>
-                                <div class="mb-3">
-                                    <strong>Conteúdo:</strong>
-                                    <div class="form-control" style="height: 200px; overflow-y: auto;">${template.body_template}</div>
-                                </div>
-                                <div class="mb-3">
-                                    <strong>Variáveis:</strong>
-                                    <div>${template.variables.map(v => `<span class="badge bg-light text-dark me-1">{{${v}}}</span>`).join('')}</div>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                                <button type="button" class="btn btn-warning" onclick="app.editTemplate(${template.id})">
-                                    <i class="fas fa-edit me-1"></i>Editar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            const existingModal = document.getElementById('templateDetailModal');
-            if (existingModal) existingModal.remove();
-
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-            const modal = new bootstrap.Modal(document.getElementById('templateDetailModal'));
-            modal.show();
-
-        } catch (error) {
-            console.error('Error loading template detail:', error);
-            this.showAlert('Erro ao carregar detalhes do template', 'danger');
-        }
-    }
-
-    async toggleTemplate(templateId) {
-        try {
-            await this.apiCall(`/api/templates/${templateId}/toggle`, 'POST');
-            
-            this.showAlert('Status do template alterado com sucesso!', 'success');
-            this.loadTemplates();
-
-        } catch (error) {
-            console.error('Error toggling template:', error);
-            this.showAlert('Erro ao alterar status do template', 'danger');
-        }
-    }
-
-    showCreateTemplateModal() {
-        this.showAlert('Funcionalidade de criação de templates em desenvolvimento', 'info');
-    }
-
-    editTemplate(templateId) {
-        this.showAlert('Funcionalidade de edição de templates em desenvolvimento', 'info');
-    }
-
-    searchTemplates() {
-        this.showAlert('Funcionalidade de busca de templates em desenvolvimento', 'info');
+        // Reset page and reload
+        this.currentPage = 1;
+        this.loadCurrentSection();
     }
 }
 
-// Initialize the application
-const app = new GmailAIAgent();
+// Initialize dashboard when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    window.dashboard = new GmailAIDashboard();
+});
 
 // Global functions for onclick handlers
-window.app = app;
+window.dashboard = null;
