@@ -15,20 +15,11 @@ class GmailAIAgent {
     }
 
     setupEventListeners() {
-        // Navigation - fix for nav links
-        document.querySelectorAll('.nav-link').forEach(link => {
+        // Navigation - use data-section attribute
+        document.querySelectorAll('[data-section]').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const section = link.textContent.toLowerCase().trim();
-                let sectionName = section;
-                
-                // Map display names to section names
-                if (section === 'emails') sectionName = 'emails';
-                else if (section === 'respostas') sectionName = 'responses';
-                else if (section === 'templates') sectionName = 'templates';
-                else if (section === 'admin') sectionName = 'admin';
-                else if (section === 'dashboard') sectionName = 'dashboard';
-                
+                const sectionName = link.getAttribute('data-section');
                 this.showSection(sectionName);
             });
         });
