@@ -164,10 +164,25 @@ def get_email_detail(email_id):
 
 @email_bp.route('/<int:email_id>/responses', methods=['POST'])
 def generate_response(email_id):
-    """Generate a new response for an email"""
+    """Generate a new response for an email (MANUAL SELECTION ONLY)"""
     try:
         email = Email.query.get_or_404(email_id)
-        data = request.get_json()
+        data = request.get_json() or {}
+        
+        # Check if email is suitable for response generation
+        if not _is_suitable_for_response(email):
+            return jsonify({
+                'error': 'Este email não é adequado para geração de resposta automática',
+                'reason': 'Email classificado como spam, comercial ou não relevante para leads/alunos'
+            }), 400
+        
+        # Check if response already exists
+        existing_response = EmailResponse.query.filter_by(email_id=email.id).first()
+        if existing_response:
+            return jsonify({
+                'error': 'Resposta já existe para este email',
+                'existing_response_id': existing_response.id
+            }), 400
         
         # Initialize AI service
         ai_service = AIService(
@@ -197,7 +212,7 @@ def generate_response(email_id):
         
         # Get template if specified
         template = None
-        if data and data.get('template_id'):
+        if data.get('template_id'):
             template_record = EmailTemplate.query.get(data['template_id'])
             if template_record:
                 template = {
@@ -207,8 +222,16 @@ def generate_response(email_id):
                     'variables': template_record.variables
                 }
         
+        # Add custom instructions if provided
+        custom_instructions = data.get('custom_instructions', '')
+        
         # Generate response
-        generated_response = ai_service.generate_response(email_data, classification, template)
+        generated_response = ai_service.generate_response(
+            email_data, 
+            classification, 
+            template,
+            custom_instructions=custom_instructions
+        )
         
         # Save response
         response_record = EmailResponse(
@@ -223,6 +246,10 @@ def generate_response(email_id):
         )
         
         db.session.add(response_record)
+        
+        # Mark email as having response generated
+        email.status = 'response_generated'
+        
         db.session.commit()
         
         return jsonify({
@@ -232,12 +259,175 @@ def generate_response(email_id):
             'body_html': response_record.body_html,
             'confidence': response_record.generation_confidence,
             'status': response_record.status,
-            'created_at': response_record.created_at.isoformat()
+            'created_at': response_record.created_at.isoformat(),
+            'message': 'Resposta gerada com sucesso! Revise e aprove antes de enviar.'
         })
         
     except Exception as e:
         current_app.logger.error(f"Error generating response: {str(e)}")
         return jsonify({'error': 'Failed to generate response'}), 500
+
+def _is_suitable_for_response(email):
+    """Check if email is suitable for response generation (leads/students focus)"""
+    
+    # Skip spam and commercial emails
+    if email.classification_type in ['spam', 'comercial', 'newsletter']:
+        return False
+    
+    # Skip automated emails
+    automated_senders = [
+        'noreply', 'no-reply', 'donotreply', 'do-not-reply',
+        'automated', 'system', 'notification', 'alert'
+    ]
+    
+    sender_email_lower = email.sender_email.lower()
+    for automated in automated_senders:
+        if automated in sender_email_lower:
+            return False
+    
+    # Skip known commercial domains
+    commercial_domains = [
+        'facebook.com', 'instagram.com', 'linkedin.com', 'twitter.com',
+        'mailchimp.com', 'constantcontact.com', 'aweber.com',
+        'shopify.com', 'woocommerce.com', 'wordpress.com'
+    ]
+    
+    sender_domain = sender_email_lower.split('@')[-1] if '@' in sender_email_lower else ''
+    if sender_domain in commercial_domains:
+        return False
+    
+    # Prioritize leads and students
+    lead_indicators = [
+        'duvida', 'dúvida', 'pergunta', 'curso', 'aula', 'material',
+        'concurso', 'estudo', 'prova', 'questao', 'questão',
+        'coaching', 'mentoria', 'ajuda', 'orientacao', 'orientação'
+    ]
+    
+    content_to_check = f"{email.subject} {email.body_text}".lower()
+    
+    # If it's classified as sales or support with good confidence, likely a lead
+    if email.classification_type in ['vendas', 'suporte'] and email.classification_confidence > 0.7:
+        return True
+    
+    # Check for lead indicators in content
+    for indicator in lead_indicators:
+        if indicator in content_to_check:
+            return True
+    
+    # If high priority, likely important
+    if email.classification_priority == 'alta':
+        return True
+    
+    # Default to requiring manual review for edge cases
+    return False
+
+@email_bp.route('/<int:email_id>/mark-for-response', methods=['POST'])
+def mark_email_for_response(email_id):
+    """Mark an email as suitable for response generation"""
+    try:
+        email = Email.query.get_or_404(email_id)
+        data = request.get_json() or {}
+        
+        # Update email status
+        email.needs_human_review = False
+        email.status = 'ready_for_response'
+        
+        # Add note if provided
+        if data.get('note'):
+            # You could add a notes field to the Email model if needed
+            pass
+        
+        db.session.commit()
+        
+        return jsonify({
+            'id': email.id,
+            'status': email.status,
+            'message': 'Email marcado para geração de resposta'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error marking email for response: {str(e)}")
+        return jsonify({'error': 'Failed to mark email for response'}), 500
+
+@email_bp.route('/<int:email_id>/skip-response', methods=['POST'])
+def skip_email_response(email_id):
+    """Mark an email as not needing a response"""
+    try:
+        email = Email.query.get_or_404(email_id)
+        data = request.get_json() or {}
+        
+        # Update email status
+        email.status = 'no_response_needed'
+        email.needs_human_review = False
+        
+        # Add reason if provided
+        skip_reason = data.get('reason', 'Manual decision')
+        
+        db.session.commit()
+        
+        return jsonify({
+            'id': email.id,
+            'status': email.status,
+            'skip_reason': skip_reason,
+            'message': 'Email marcado como não necessitando resposta'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error skipping email response: {str(e)}")
+        return jsonify({'error': 'Failed to skip email response'}), 500
+
+@email_bp.route('/bulk-actions', methods=['POST'])
+def bulk_email_actions():
+    """Perform bulk actions on multiple emails"""
+    try:
+        data = request.get_json()
+        email_ids = data.get('email_ids', [])
+        action = data.get('action')
+        
+        if not email_ids or not action:
+            return jsonify({'error': 'email_ids and action are required'}), 400
+        
+        emails = Email.query.filter(Email.id.in_(email_ids)).all()
+        
+        if not emails:
+            return jsonify({'error': 'No emails found'}), 404
+        
+        results = []
+        
+        for email in emails:
+            try:
+                if action == 'mark_for_response':
+                    email.status = 'ready_for_response'
+                    email.needs_human_review = False
+                    results.append({'id': email.id, 'status': 'marked_for_response'})
+                    
+                elif action == 'skip_response':
+                    email.status = 'no_response_needed'
+                    email.needs_human_review = False
+                    results.append({'id': email.id, 'status': 'skipped'})
+                    
+                elif action == 'generate_responses':
+                    if _is_suitable_for_response(email):
+                        # This would trigger response generation
+                        email.status = 'ready_for_response'
+                        results.append({'id': email.id, 'status': 'ready_for_generation'})
+                    else:
+                        results.append({'id': email.id, 'status': 'not_suitable'})
+                        
+            except Exception as e:
+                results.append({'id': email.id, 'status': 'error', 'error': str(e)})
+        
+        db.session.commit()
+        
+        return jsonify({
+            'action': action,
+            'processed': len(results),
+            'results': results
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in bulk actions: {str(e)}")
+        return jsonify({'error': 'Failed to perform bulk actions'}), 500
 
 @email_bp.route('/responses/<int:response_id>/approve', methods=['POST'])
 def approve_response(response_id):

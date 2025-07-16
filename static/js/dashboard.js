@@ -362,12 +362,24 @@ class GmailAIAgent {
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-outline-primary" onclick="app.showEmailDetail(${email.id})">
+                                        <button class="btn btn-outline-primary" onclick="app.showEmailDetail(${email.id})" title="Ver detalhes">
                                             <i class="fas fa-eye"></i>
                                         </button>
-                                        <button class="btn btn-outline-success" onclick="app.generateResponse(${email.id})">
-                                            <i class="fas fa-reply"></i>
-                                        </button>
+                                        ${email.response_count > 0 ? `
+                                            <button class="btn btn-success" disabled title="Resposta já gerada">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                        ` : `
+                                            <button class="btn btn-outline-success" onclick="app.showResponseGenerationModal(${email.id})" title="Gerar resposta">
+                                                <i class="fas fa-reply"></i>
+                                            </button>
+                                            <button class="btn btn-outline-warning" onclick="app.markForResponse(${email.id})" title="Marcar para resposta">
+                                                <i class="fas fa-star"></i>
+                                            </button>
+                                            <button class="btn btn-outline-secondary" onclick="app.skipResponse(${email.id})" title="Não responder">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        `}
                                     </div>
                                 </td>
                             </tr>
@@ -518,13 +530,116 @@ class GmailAIAgent {
         }
     }
 
+    async showResponseGenerationModal(emailId) {
+        try {
+            const email = await this.apiCall(`/api/emails/${emailId}`);
+            
+            const modalHtml = `
+                <div class="modal fade" id="responseGenerationModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Gerar Resposta - Controle Manual</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Controle Manual Ativo:</strong> Você está escolhendo manualmente quais emails recebem respostas automáticas.
+                                    Foque em leads e alunos, evitando spam e emails comerciais.
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <h6>Email Selecionado:</h6>
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <strong>De:</strong> ${email.sender_name} <${email.sender_email}><br>
+                                                <strong>Assunto:</strong> ${email.subject}<br>
+                                                <strong>Classificação:</strong> 
+                                                <span class="badge bg-${email.classification.type || 'secondary'}">${email.classification.type || 'N/A'}</span>
+                                                <span class="badge bg-${email.classification.priority || 'secondary'}">${email.classification.priority || 'N/A'}</span><br>
+                                                <strong>Confiança:</strong> ${Math.round((email.classification.confidence || 0) * 100)}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <label class="form-label">Instruções Personalizadas (Opcional)</label>
+                                        <textarea class="form-control" id="customInstructions" rows="3" 
+                                                  placeholder="Ex: Mencionar promoção especial, incluir link específico, tom mais formal, etc."></textarea>
+                                        <small class="form-text text-muted">
+                                            Adicione instruções específicas para personalizar a resposta gerada pela IA.
+                                        </small>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <label class="form-label">Template (Opcional)</label>
+                                        <select class="form-select" id="templateSelect">
+                                            <option value="">Sem template específico</option>
+                                            <option value="1">Resposta Padrão</option>
+                                            <option value="2">Confirmação de Pagamento</option>
+                                            <option value="3">Informações sobre Cursos</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Lembre-se:</strong> A resposta será gerada como rascunho e precisará ser aprovada antes do envio.
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-success" onclick="app.generateResponse(${emailId})">
+                                    <i class="fas fa-magic me-1"></i>Gerar Resposta
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const existingModal = document.getElementById('responseGenerationModal');
+            if (existingModal) existingModal.remove();
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('responseGenerationModal'));
+            modal.show();
+
+        } catch (error) {
+            console.error('Error showing response generation modal:', error);
+            this.showAlert('Erro ao carregar modal de geração de resposta', 'danger');
+        }
+    }
+
     async generateResponse(emailId) {
         try {
             this.showLoading();
             
-            const response = await this.apiCall(`/api/emails/${emailId}/responses`, 'POST');
+            // Get custom instructions and template from modal
+            const customInstructions = document.getElementById('customInstructions')?.value || '';
+            const templateId = document.getElementById('templateSelect')?.value || null;
             
-            this.showAlert('Resposta gerada com sucesso!', 'success');
+            const requestData = {};
+            if (customInstructions) {
+                requestData.custom_instructions = customInstructions;
+            }
+            if (templateId) {
+                requestData.template_id = parseInt(templateId);
+            }
+            
+            const response = await this.apiCall(`/api/emails/${emailId}/responses`, 'POST', requestData);
+            
+            this.showAlert(response.message || 'Resposta gerada com sucesso!', 'success');
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('responseGenerationModal'));
+            if (modal) modal.hide();
             
             // Refresh current view
             if (this.currentSection === 'emails') {
@@ -533,7 +648,73 @@ class GmailAIAgent {
 
         } catch (error) {
             console.error('Error generating response:', error);
-            this.showAlert('Erro ao gerar resposta', 'danger');
+            const errorMessage = error.message || 'Erro ao gerar resposta';
+            this.showAlert(errorMessage, 'danger');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async markForResponse(emailId) {
+        try {
+            const response = await this.apiCall(`/api/emails/${emailId}/mark-for-response`, 'POST');
+            
+            this.showAlert(response.message || 'Email marcado para geração de resposta', 'success');
+            
+            // Refresh current view
+            if (this.currentSection === 'emails') {
+                this.loadEmails();
+            }
+
+        } catch (error) {
+            console.error('Error marking email for response:', error);
+            this.showAlert('Erro ao marcar email para resposta', 'danger');
+        }
+    }
+
+    async skipResponse(emailId) {
+        try {
+            // Show confirmation dialog
+            if (!confirm('Tem certeza que este email não precisa de resposta?')) {
+                return;
+            }
+            
+            const response = await this.apiCall(`/api/emails/${emailId}/skip-response`, 'POST', {
+                reason: 'Manual decision - not suitable for response'
+            });
+            
+            this.showAlert(response.message || 'Email marcado como não necessitando resposta', 'info');
+            
+            // Refresh current view
+            if (this.currentSection === 'emails') {
+                this.loadEmails();
+            }
+
+        } catch (error) {
+            console.error('Error skipping email response:', error);
+            this.showAlert('Erro ao marcar email como não necessitando resposta', 'danger');
+        }
+    }
+
+    async bulkEmailActions(action, emailIds) {
+        try {
+            this.showLoading();
+            
+            const response = await this.apiCall('/api/emails/bulk-actions', 'POST', {
+                action: action,
+                email_ids: emailIds
+            });
+            
+            this.showAlert(`Ação em lote concluída: ${response.processed} emails processados`, 'success');
+            
+            // Refresh current view
+            if (this.currentSection === 'emails') {
+                this.loadEmails();
+            }
+
+        } catch (error) {
+            console.error('Error in bulk actions:', error);
+            this.showAlert('Erro ao executar ação em lote', 'danger');
         } finally {
             this.hideLoading();
         }
