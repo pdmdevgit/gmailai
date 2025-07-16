@@ -1,14 +1,40 @@
-from flask import Blueprint, render_template, jsonify, current_app, request
+from flask import Blueprint, render_template, jsonify, current_app, request, send_from_directory, make_response
 from app.models import db, Email, EmailResponse, ProcessingLog
 from sqlalchemy import func, desc, text
 from datetime import datetime, timedelta
+import os
 
 main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/')
 def index():
     """Main dashboard page"""
-    return render_template('dashboard.html')
+    response = make_response(render_template('dashboard.html'))
+    # Add anti-cache headers
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+@main_bp.route('/static/<path:filename>')
+def static_files(filename):
+    """Serve static files with anti-cache headers"""
+    try:
+        static_folder = os.path.join(current_app.root_path, '..', 'static')
+        response = make_response(send_from_directory(static_folder, filename))
+        
+        # Force no cache for JavaScript and CSS files
+        if filename.endswith(('.js', '.css')):
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+            response.headers['Last-Modified'] = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+            response.headers['ETag'] = f'"{datetime.utcnow().timestamp()}"'
+        
+        return response
+    except Exception as e:
+        current_app.logger.error(f"Error serving static file {filename}: {str(e)}")
+        return "File not found", 404
 
 @main_bp.route('/health')
 def health_check():
