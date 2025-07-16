@@ -60,11 +60,11 @@ def get_templates():
             template_data = {
                 'id': template.id,
                 'name': template.name,
-                'description': template.description,
+                'description': getattr(template, 'description', ''),
                 'category': template.category,
                 'subject_template': template.subject_template,
-                'body_preview': template.body_template[:200] + '...' if len(template.body_template) > 200 else template.body_template,
-                'variables': json.loads(template.variables) if template.variables else [],
+                'body_preview': template.body_template[:200] + '...' if len(template.body_template or '') > 200 else (template.body_template or ''),
+                'variables': template.variables if template.variables else [],
                 'is_active': template.is_active,
                 'usage_count': usage_count,
                 'created_at': template.created_at.isoformat(),
@@ -118,11 +118,11 @@ def get_template_detail(template_id):
         template_data = {
             'id': template.id,
             'name': template.name,
-            'description': template.description,
+            'description': getattr(template, 'description', ''),
             'category': template.category,
             'subject_template': template.subject_template,
             'body_template': template.body_template,
-            'variables': json.loads(template.variables) if template.variables else [],
+            'variables': template.variables if template.variables else [],
             'is_active': template.is_active,
             'usage_count': usage_count,
             'recent_usage': usage_examples,
@@ -156,11 +156,10 @@ def create_template():
         # Create template
         template = EmailTemplate(
             name=data['name'],
-            description=data.get('description', ''),
             category=data.get('category', 'general'),
             subject_template=data['subject_template'],
             body_template=data['body_template'],
-            variables=json.dumps(data.get('variables', [])),
+            variables=data.get('variables', []),
             is_active=data.get('is_active', True)
         )
         
@@ -170,11 +169,10 @@ def create_template():
         return jsonify({
             'id': template.id,
             'name': template.name,
-            'description': template.description,
             'category': template.category,
             'subject_template': template.subject_template,
             'body_template': template.body_template,
-            'variables': json.loads(template.variables),
+            'variables': template.variables,
             'is_active': template.is_active,
             'created_at': template.created_at.isoformat()
         }), 201
@@ -199,8 +197,6 @@ def update_template(template_id):
         # Update fields
         if 'name' in data:
             template.name = data['name']
-        if 'description' in data:
-            template.description = data['description']
         if 'category' in data:
             template.category = data['category']
         if 'subject_template' in data:
@@ -208,7 +204,7 @@ def update_template(template_id):
         if 'body_template' in data:
             template.body_template = data['body_template']
         if 'variables' in data:
-            template.variables = json.dumps(data['variables'])
+            template.variables = data['variables']
         if 'is_active' in data:
             template.is_active = data['is_active']
         
@@ -218,11 +214,10 @@ def update_template(template_id):
         return jsonify({
             'id': template.id,
             'name': template.name,
-            'description': template.description,
             'category': template.category,
             'subject_template': template.subject_template,
             'body_template': template.body_template,
-            'variables': json.loads(template.variables),
+            'variables': template.variables,
             'is_active': template.is_active,
             'updated_at': template.updated_at.isoformat()
         })
