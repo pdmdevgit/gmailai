@@ -251,8 +251,13 @@ def authenticate_gmail_account():
             ]
         )
         
-        # Set redirect URI
-        flow.redirect_uri = f"{request.host_url}auth/callback"
+        # Set redirect URI - use HTTPS in production
+        if request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https' or 'devpdm.com' in request.host:
+            redirect_uri = f"https://{request.host}/auth/callback"
+        else:
+            redirect_uri = f"{request.host_url}auth/callback"
+        
+        flow.redirect_uri = redirect_uri
         
         # Generate authorization URL
         authorization_url, state = flow.authorization_url(
