@@ -818,10 +818,8 @@ class GmailAIAgent {
 
     // Utility methods
     async apiCall(url, method = 'GET', data = null) {
-        // Ensure HTTPS URLs for API calls
-        const baseUrl = window.location.protocol === 'https:' ? 
-            `https://${window.location.host}` : 
-            `http://${window.location.host}`;
+        // Force HTTPS URLs for API calls in production
+        const baseUrl = `https://${window.location.host}`;
         
         const fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : url;
         
