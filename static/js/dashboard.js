@@ -592,7 +592,7 @@ class GmailAIDashboard {
     }
 
     renderResponses(data) {
-        const container = document.getElementById('responsesContent');
+        const container = document.getElementById('responses-table-container');
         if (!container) return;
 
         if (!data || !data.responses || data.responses.length === 0) {
@@ -606,49 +606,75 @@ class GmailAIDashboard {
             return;
         }
 
-        const responsesHtml = data.responses.map(response => `
-            <div class="response-item" data-response-id="${response.id}">
-                <div class="response-header">
-                    <div class="response-email">
-                        <strong>Para: ${response.email.sender_name}</strong>
-                        <span class="text-muted"><${response.email.sender_email}></span>
-                    </div>
-                    <div class="response-date">${this.formatDate(response.created_at)}</div>
-                </div>
-                <div class="response-subject">
-                    <h6>Re: ${response.email.subject}</h6>
-                </div>
-                <div class="response-preview">
-                    ${response.response_text.substring(0, 200)}...
-                </div>
-                <div class="response-footer">
-                    <div class="response-status">
-                        <span class="badge badge-${this.getResponseStatusColor(response.status)}">${this.getResponseStatusText(response.status)}</span>
-                        ${response.template ? `<span class="badge badge-info">${response.template.name}</span>` : ''}
-                    </div>
-                    <div class="response-actions">
-                        <button class="btn btn-sm btn-outline-primary" onclick="dashboard.viewResponse('${response.id}')">
-                            <i class="fas fa-eye"></i> Ver
-                        </button>
-                        ${response.status === 'pending' ? `
-                            <button class="btn btn-sm btn-outline-success" onclick="dashboard.approveResponse('${response.id}')">
-                                <i class="fas fa-check"></i> Aprovar
-                            </button>
-                            <button class="btn btn-sm btn-outline-warning" onclick="dashboard.editResponse('${response.id}')">
-                                <i class="fas fa-edit"></i> Editar
-                            </button>
-                        ` : ''}
-                        ${response.status === 'approved' ? `
-                            <button class="btn btn-sm btn-outline-primary" onclick="dashboard.sendResponse('${response.id}')">
-                                <i class="fas fa-paper-plane"></i> Enviar
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
+        // Create table
+        const tableHtml = `
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Para</th>
+                            <th>Assunto</th>
+                            <th>Template</th>
+                            <th>Data</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.responses.map(response => `
+                            <tr data-response-id="${response.id}">
+                                <td>
+                                    <div>
+                                        <strong>${response.email.sender_name || response.email.sender_email}</strong><br>
+                                        <small class="text-muted">${response.email.sender_email}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>Re: ${response.email.subject}</strong><br>
+                                        <small class="text-muted">${response.response_text ? response.response_text.substring(0, 60) + '...' : ''}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    ${response.template ? 
+                                        `<span class="badge bg-info">${response.template.name}</span>` : 
+                                        '<span class="badge bg-secondary">Manual</span>'
+                                    }
+                                </td>
+                                <td>
+                                    <small>${this.formatDate(response.created_at)}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-${this.getResponseStatusColor(response.status)}">${this.getResponseStatusText(response.status)}</span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" onclick="app.viewResponse('${response.id}')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        ${response.status === 'pending' ? `
+                                            <button class="btn btn-outline-success" onclick="app.approveResponse('${response.id}')">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                            <button class="btn btn-outline-warning" onclick="app.editResponse('${response.id}')">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        ` : ''}
+                                        ${response.status === 'approved' ? `
+                                            <button class="btn btn-outline-primary" onclick="app.sendResponse('${response.id}')">
+                                                <i class="fas fa-paper-plane"></i>
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
             </div>
-        `).join('');
+        `;
 
-        container.innerHTML = responsesHtml;
+        container.innerHTML = tableHtml;
         this.updatePagination(data.pagination);
     }
 
@@ -673,7 +699,7 @@ class GmailAIDashboard {
     }
 
     renderTemplates(data) {
-        const container = document.getElementById('templatesContent');
+        const container = document.getElementById('templates-grid-container');
         if (!container) return;
 
         if (!data || !data.templates || data.templates.length === 0) {
@@ -682,7 +708,7 @@ class GmailAIDashboard {
                     <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
                     <h5>Nenhum template encontrado</h5>
                     <p class="text-muted">Não há templates para exibir no momento.</p>
-                    <button class="btn btn-primary" onclick="dashboard.showCreateTemplateModal()">
+                    <button class="btn btn-primary" onclick="app.showCreateTemplateModal()">
                         <i class="fas fa-plus"></i> Criar Template
                     </button>
                 </div>
@@ -690,43 +716,49 @@ class GmailAIDashboard {
             return;
         }
 
-        const templatesHtml = data.templates.map(template => `
-            <div class="template-item" data-template-id="${template.id}">
-                <div class="template-header">
-                    <div class="template-name">
-                        <strong>${template.name}</strong>
-                        <span class="badge badge-${template.is_active ? 'success' : 'secondary'}">
-                            ${template.is_active ? 'Ativo' : 'Inativo'}
-                        </span>
+        const templatesHtml = `
+            <div class="row">
+                ${data.templates.map(template => `
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card h-100" data-template-id="${template.id}">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">${template.name}</h6>
+                                <div>
+                                    <span class="badge bg-${template.is_active ? 'success' : 'secondary'}">
+                                        ${template.is_active ? 'Ativo' : 'Inativo'}
+                                    </span>
+                                    <span class="badge bg-info ms-1">${template.category}</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text text-muted small">
+                                    ${template.description || 'Sem descrição'}
+                                </p>
+                                <div class="template-preview bg-light p-2 rounded small" style="max-height: 100px; overflow: hidden;">
+                                    ${template.content.substring(0, 150)}...
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">Usado ${template.usage_count || 0} vezes</small>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" onclick="app.viewTemplate('${template.id}')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-outline-warning" onclick="app.editTemplate('${template.id}')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-outline-${template.is_active ? 'secondary' : 'success'}" onclick="app.toggleTemplate('${template.id}')">
+                                            <i class="fas fa-${template.is_active ? 'pause' : 'play'}"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="template-category">
-                        <span class="badge badge-info">${template.category}</span>
-                    </div>
-                </div>
-                <div class="template-description">
-                    ${template.description || 'Sem descrição'}
-                </div>
-                <div class="template-preview">
-                    ${template.content.substring(0, 150)}...
-                </div>
-                <div class="template-footer">
-                    <div class="template-stats">
-                        <small class="text-muted">Usado ${template.usage_count || 0} vezes</small>
-                    </div>
-                    <div class="template-actions">
-                        <button class="btn btn-sm btn-outline-primary" onclick="dashboard.viewTemplate('${template.id}')">
-                            <i class="fas fa-eye"></i> Ver
-                        </button>
-                        <button class="btn btn-sm btn-outline-warning" onclick="dashboard.editTemplate('${template.id}')">
-                            <i class="fas fa-edit"></i> Editar
-                        </button>
-                        <button class="btn btn-sm btn-outline-${template.is_active ? 'secondary' : 'success'}" onclick="dashboard.toggleTemplate('${template.id}')">
-                            <i class="fas fa-${template.is_active ? 'pause' : 'play'}"></i> ${template.is_active ? 'Desativar' : 'Ativar'}
-                        </button>
-                    </div>
-                </div>
+                `).join('')}
             </div>
-        `).join('');
+        `;
 
         container.innerHTML = templatesHtml;
         this.updatePagination(data.pagination);
@@ -1315,5 +1347,167 @@ window.app = {
         
         // Force page reload
         window.location.reload(true);
+    },
+    
+    // Response functions
+    generateBulkResponses: function() {
+        if (window.dashboard) {
+            window.dashboard.showAlert('Gerando respostas em lote...', 'info');
+            // TODO: Implement bulk response generation
+        }
+    },
+    filterResponses: function() {
+        if (window.dashboard) {
+            window.dashboard.currentPage = 1;
+            return window.dashboard.loadResponses();
+        }
+    },
+    clearResponseFilters: function() {
+        const filters = ['response-status-filter', 'response-template-filter', 'response-search-input'];
+        filters.forEach(filterId => {
+            const element = document.getElementById(filterId);
+            if (element) {
+                element.value = '';
+            }
+        });
+        
+        if (window.dashboard) {
+            window.dashboard.currentPage = 1;
+            return window.dashboard.loadResponses();
+        }
+    },
+    viewResponse: function(responseId) {
+        if (window.dashboard) {
+            return window.dashboard.viewResponse(responseId);
+        }
+    },
+    approveResponse: function(responseId) {
+        if (window.dashboard) {
+            return window.dashboard.approveResponse(responseId);
+        }
+    },
+    editResponse: function(responseId) {
+        if (window.dashboard) {
+            window.dashboard.showAlert('Função de edição em desenvolvimento', 'info');
+        }
+    },
+    sendResponse: function(responseId) {
+        if (window.dashboard) {
+            return window.dashboard.sendResponse(responseId);
+        }
+    },
+    generateResponseFromModal: function() {
+        const emailId = document.getElementById('responseEmailId').value;
+        if (emailId && window.dashboard) {
+            return window.dashboard.generateResponse(emailId);
+        }
+    },
+    generateAIResponse: function() {
+        const emailId = document.getElementById('responseEmailId').value;
+        const template = document.getElementById('responseTemplate').value;
+        
+        if (window.dashboard) {
+            window.dashboard.showAlert('Gerando resposta com IA...', 'info');
+            // TODO: Implement AI response generation
+        }
+    },
+    saveResponse: function() {
+        const emailId = document.getElementById('responseEmailId').value;
+        const content = document.getElementById('responseContent').value;
+        const template = document.getElementById('responseTemplate').value;
+        const sendImmediately = document.getElementById('sendImmediately').checked;
+        
+        if (!content.trim()) {
+            if (window.dashboard) {
+                window.dashboard.showAlert('Por favor, insira o conteúdo da resposta', 'warning');
+            }
+            return;
+        }
+        
+        if (window.dashboard) {
+            return window.dashboard.sendResponse(emailId, {
+                content: content,
+                template_id: template,
+                send_immediately: sendImmediately
+            });
+        }
+    },
+    
+    // Template functions
+    showCreateTemplateModal: function() {
+        // Clear form
+        document.getElementById('templateId').value = '';
+        document.getElementById('templateName').value = '';
+        document.getElementById('templateCategory').value = 'vendas';
+        document.getElementById('templateDescription').value = '';
+        document.getElementById('templateContent').value = '';
+        document.getElementById('templateActive').checked = true;
+        document.getElementById('templateModalTitle').textContent = 'Novo Template';
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('templateModal'));
+        modal.show();
+    },
+    filterTemplatesByCategory: function(category) {
+        // Update active button
+        document.querySelectorAll('.btn-group .btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        if (window.dashboard) {
+            // TODO: Implement category filtering
+            window.dashboard.showAlert(`Filtrando templates por: ${category}`, 'info');
+        }
+    },
+    viewTemplate: function(templateId) {
+        if (window.dashboard) {
+            return window.dashboard.viewTemplate(templateId);
+        }
+    },
+    editTemplate: function(templateId) {
+        if (window.dashboard) {
+            // TODO: Load template data and show modal
+            window.dashboard.showAlert('Carregando template para edição...', 'info');
+        }
+    },
+    toggleTemplate: function(templateId) {
+        if (window.dashboard) {
+            return window.dashboard.toggleTemplate(templateId);
+        }
+    },
+    saveTemplate: function() {
+        const templateId = document.getElementById('templateId').value;
+        const name = document.getElementById('templateName').value;
+        const category = document.getElementById('templateCategory').value;
+        const description = document.getElementById('templateDescription').value;
+        const content = document.getElementById('templateContent').value;
+        const isActive = document.getElementById('templateActive').checked;
+        
+        if (!name.trim() || !content.trim()) {
+            if (window.dashboard) {
+                window.dashboard.showAlert('Por favor, preencha nome e conteúdo do template', 'warning');
+            }
+            return;
+        }
+        
+        const templateData = {
+            name: name,
+            category: category,
+            description: description,
+            content: content,
+            is_active: isActive
+        };
+        
+        if (window.dashboard) {
+            // TODO: Implement template saving
+            window.dashboard.showAlert('Salvando template...', 'info');
+            
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('templateModal'));
+            if (modal) {
+                modal.hide();
+            }
+        }
     }
 };

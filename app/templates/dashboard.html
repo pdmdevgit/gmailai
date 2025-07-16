@@ -286,15 +286,102 @@
             </div>
         </div>
 
-        <!-- Other sections will be added here -->
+        <!-- Responses Section -->
         <div id="responses-section" class="content-section" style="display: none;">
-            <h2>Gerenciamento de Respostas</h2>
-            <p>Seção de respostas em desenvolvimento...</p>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <h2>Gerenciamento de Respostas</h2>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button class="btn btn-success" onclick="app.generateBulkResponses()">
+                        <i class="fas fa-magic me-1"></i>Gerar Respostas em Lote
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-2">
+                            <select class="form-select" id="response-status-filter">
+                                <option value="">Todos os status</option>
+                                <option value="pending">Pendente</option>
+                                <option value="approved">Aprovada</option>
+                                <option value="sent">Enviada</option>
+                                <option value="rejected">Rejeitada</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <select class="form-select" id="response-template-filter">
+                                <option value="">Todos os templates</option>
+                                <option value="vendas">Vendas</option>
+                                <option value="suporte">Suporte</option>
+                                <option value="informacao">Informação</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" class="form-control" id="response-search-input" placeholder="Buscar respostas...">
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-primary" onclick="app.filterResponses()">
+                                <i class="fas fa-search me-1"></i>Filtrar
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="app.clearResponseFilters()">
+                                <i class="fas fa-times me-1"></i>Limpar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Responses Table -->
+            <div class="card">
+                <div class="card-body">
+                    <div id="responses-table-container">
+                        <!-- Responses table will be loaded here -->
+                    </div>
+                </div>
+            </div>
         </div>
 
+        <!-- Templates Section -->
         <div id="templates-section" class="content-section" style="display: none;">
-            <h2>Templates de Email</h2>
-            <p>Seção de templates em desenvolvimento...</p>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <h2>Templates de Email</h2>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button class="btn btn-primary" onclick="app.showCreateTemplateModal()">
+                        <i class="fas fa-plus me-1"></i>Novo Template
+                    </button>
+                </div>
+            </div>
+
+            <!-- Template Categories -->
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary active" onclick="app.filterTemplatesByCategory('all')">
+                            Todos
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" onclick="app.filterTemplatesByCategory('vendas')">
+                            Vendas
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" onclick="app.filterTemplatesByCategory('suporte')">
+                            Suporte
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" onclick="app.filterTemplatesByCategory('informacao')">
+                            Informação
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Templates Grid -->
+            <div id="templates-grid-container">
+                <!-- Templates grid will be loaded here -->
+            </div>
         </div>
 
         <div id="admin-section" class="content-section" style="display: none;">
@@ -312,6 +399,135 @@
                         <span class="visually-hidden">Carregando...</span>
                     </div>
                     <p class="mt-2 mb-0">Processando...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Email View Modal -->
+    <div class="modal fade" id="emailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalEmailSubject">Assunto do Email</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <strong>De:</strong> <span id="modalEmailFrom"></span>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Data:</strong> <span id="modalEmailDate"></span>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Conteúdo:</strong>
+                        <div id="modalEmailBody" class="border p-3 mt-2" style="max-height: 400px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary" onclick="app.generateResponseFromModal()">
+                        <i class="fas fa-reply me-1"></i>Gerar Resposta
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Response Modal -->
+    <div class="modal fade" id="responseModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Gerar Resposta</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="responseEmailId">
+                    <div class="mb-3">
+                        <strong>Para:</strong> <span id="responseEmailFrom"></span>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Assunto:</strong> <span id="responseEmailSubject"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label for="responseTemplate" class="form-label">Template</label>
+                        <select class="form-select" id="responseTemplate">
+                            <option value="">Selecione um template</option>
+                            <option value="vendas">Vendas</option>
+                            <option value="suporte">Suporte</option>
+                            <option value="informacao">Informação</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="responseContent" class="form-label">Conteúdo da Resposta</label>
+                        <textarea class="form-control" id="responseContent" rows="8" placeholder="A resposta será gerada automaticamente..."></textarea>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="sendImmediately">
+                        <label class="form-check-label" for="sendImmediately">
+                            Enviar imediatamente após aprovação
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning" onclick="app.generateAIResponse()">
+                        <i class="fas fa-magic me-1"></i>Gerar com IA
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="app.saveResponse()">
+                        <i class="fas fa-save me-1"></i>Salvar Resposta
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Modal -->
+    <div class="modal fade" id="templateModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="templateModalTitle">Novo Template</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="templateId">
+                    <div class="mb-3">
+                        <label for="templateName" class="form-label">Nome do Template</label>
+                        <input type="text" class="form-control" id="templateName" placeholder="Ex: Resposta de Vendas">
+                    </div>
+                    <div class="mb-3">
+                        <label for="templateCategory" class="form-label">Categoria</label>
+                        <select class="form-select" id="templateCategory">
+                            <option value="vendas">Vendas</option>
+                            <option value="suporte">Suporte</option>
+                            <option value="informacao">Informação</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="templateDescription" class="form-label">Descrição</label>
+                        <input type="text" class="form-control" id="templateDescription" placeholder="Breve descrição do template">
+                    </div>
+                    <div class="mb-3">
+                        <label for="templateContent" class="form-label">Conteúdo</label>
+                        <textarea class="form-control" id="templateContent" rows="10" placeholder="Conteúdo do template..."></textarea>
+                        <div class="form-text">
+                            Use variáveis como {{nome}}, {{produto}}, {{empresa}} para personalização automática.
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="templateActive" checked>
+                        <label class="form-check-label" for="templateActive">
+                            Template ativo
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="app.saveTemplate()">
+                        <i class="fas fa-save me-1"></i>Salvar Template
+                    </button>
                 </div>
             </div>
         </div>
