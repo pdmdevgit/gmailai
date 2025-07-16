@@ -15,11 +15,21 @@ class GmailAIAgent {
     }
 
     setupEventListeners() {
-        // Navigation
-        document.querySelectorAll('[data-section]').forEach(link => {
+        // Navigation - fix for nav links
+        document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.showSection(e.target.dataset.section);
+                const section = link.textContent.toLowerCase().trim();
+                let sectionName = section;
+                
+                // Map display names to section names
+                if (section === 'emails') sectionName = 'emails';
+                else if (section === 'respostas') sectionName = 'responses';
+                else if (section === 'templates') sectionName = 'templates';
+                else if (section === 'admin') sectionName = 'admin';
+                else if (section === 'dashboard') sectionName = 'dashboard';
+                
+                this.showSection(sectionName);
             });
         });
 
