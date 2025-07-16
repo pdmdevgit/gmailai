@@ -379,7 +379,7 @@ class GmailAIAgent {
         `;
     }
 
-    createPagination(pagination) {
+    createPagination(pagination, loadFunction = 'loadEmails') {
         if (!pagination.pages || pagination.pages <= 1) return '';
 
         const pages = [];
@@ -389,7 +389,7 @@ class GmailAIAgent {
         // Previous button
         pages.push(`
             <li class="page-item ${!pagination.has_prev ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="app.loadEmails(${current - 1})">Anterior</a>
+                <a class="page-link" href="#" onclick="app.${loadFunction}(${current - 1})">Anterior</a>
             </li>
         `);
 
@@ -397,7 +397,7 @@ class GmailAIAgent {
         for (let i = Math.max(1, current - 2); i <= Math.min(total, current + 2); i++) {
             pages.push(`
                 <li class="page-item ${i === current ? 'active' : ''}">
-                    <a class="page-link" href="#" onclick="app.loadEmails(${i})">${i}</a>
+                    <a class="page-link" href="#" onclick="app.${loadFunction}(${i})">${i}</a>
                 </li>
             `);
         }
@@ -405,12 +405,12 @@ class GmailAIAgent {
         // Next button
         pages.push(`
             <li class="page-item ${!pagination.has_next ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="app.loadEmails(${current + 1})">Próximo</a>
+                <a class="page-link" href="#" onclick="app.${loadFunction}(${current + 1})">Próximo</a>
             </li>
         `);
 
         return `
-            <nav aria-label="Paginação de emails">
+            <nav aria-label="Paginação">
                 <ul class="pagination justify-content-center">
                     ${pages.join('')}
                 </ul>
@@ -574,14 +574,262 @@ class GmailAIAgent {
         this.loadEmails(1);
     }
 
-    loadResponses() {
-        // Placeholder for responses section
-        console.log('Loading responses...');
+    async loadResponses() {
+        try {
+            this.showLoading();
+            
+            const params = new URLSearchParams({
+                page: 1,
+                per_page: 20
+            });
+
+            // Add filters if they exist
+            const statusFilter = document.getElementById('response-status-filter');
+            const accountFilter = document.getElementById('response-account-filter');
+            
+            if (statusFilter && statusFilter.value) {
+                params.append('status', statusFilter.value);
+            }
+            if (accountFilter && accountFilter.value) {
+                params.append('account', accountFilter.value);
+            }
+
+            const data = await this.apiCall(`/api/responses?${params}`);
+            this.displayResponsesTable(data);
+
+        } catch (error) {
+            console.error('Error loading responses:', error);
+            this.showAlert('Erro ao carregar respostas', 'danger');
+        } finally {
+            this.hideLoading();
+        }
     }
 
-    loadTemplates() {
-        // Placeholder for templates section
-        console.log('Loading templates...');
+    displayResponsesTable(data) {
+        const responsesSection = document.getElementById('responses-section');
+        if (!responsesSection) return;
+
+        const responses = data.responses || [];
+        const pagination = data.pagination || {};
+
+        responsesSection.innerHTML = `
+            <h2>Gerenciamento de Respostas</h2>
+            
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <select class="form-select" id="response-status-filter">
+                        <option value="">Todos os status</option>
+                        <option value="draft">Rascunho</option>
+                        <option value="approved">Aprovado</option>
+                        <option value="sent">Enviado</option>
+                        <option value="rejected">Rejeitado</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="response-account-filter">
+                        <option value="">Todas as contas</option>
+                        <option value="contato">contato</option>
+                        <option value="cursos">cursos</option>
+                        <option value="diogo">diogo</option>
+                        <option value="sac">sac</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <button class="btn btn-primary" onclick="app.loadResponses()">
+                        <i class="fas fa-sync me-1"></i>Atualizar
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Email Original</th>
+                                    <th>Assunto da Resposta</th>
+                                    <th>Status</th>
+                                    <th>Confiança</th>
+                                    <th>Criado</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${responses.map(response => `
+                                    <tr>
+                                        <td>#${response.id}</td>
+                                        <td>
+                                            <div class="fw-bold">${response.email.sender_name || response.email.sender_email}</div>
+                                            <small class="text-muted">${response.email.subject}</small><br>
+                                            <span class="badge bg-primary">${response.email.account}</span>
+                                        </td>
+                                        <td>
+                                            <div class="text-truncate" style="max-width: 200px;" title="${response.subject}">
+                                                ${response.subject}
+                                            </div>
+                                            <small class="text-muted">${response.body_preview}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-${this.getStatusColor(response.status)}">${response.status}</span>
+                                        </td>
+                                        <td>
+                                            <div class="confidence-bar" style="width: 60px;">
+                                                <div class="confidence-fill confidence-${this.getConfidenceLevel(response.generation_confidence)}" 
+                                                     style="width: ${(response.generation_confidence * 100)}%"></div>
+                                            </div>
+                                            <small>${Math.round(response.generation_confidence * 100)}%</small>
+                                        </td>
+                                        <td>
+                                            <small>${new Date(response.created_at).toLocaleDateString('pt-BR')}</small><br>
+                                            <small class="text-muted">${new Date(response.created_at).toLocaleTimeString('pt-BR')}</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary" onclick="app.showResponseDetail(${response.id})">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                ${response.status === 'draft' ? `
+                                                    <button class="btn btn-outline-success" onclick="app.approveResponse(${response.id})">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                ` : ''}
+                                                ${response.status === 'approved' ? `
+                                                    <button class="btn btn-outline-info" onclick="app.sendResponse(${response.id})">
+                                                        <i class="fas fa-paper-plane"></i>
+                                                    </button>
+                                                ` : ''}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    ${this.createPagination(pagination, 'loadResponses')}
+                </div>
+            </div>
+        `;
+
+        // Add event listeners for filters
+        document.getElementById('response-status-filter').addEventListener('change', () => this.loadResponses());
+        document.getElementById('response-account-filter').addEventListener('change', () => this.loadResponses());
+    }
+
+    async loadTemplates() {
+        try {
+            this.showLoading();
+            
+            const params = new URLSearchParams({
+                page: 1,
+                per_page: 20
+            });
+
+            const data = await this.apiCall(`/api/templates?${params}`);
+            this.displayTemplatesTable(data);
+
+        } catch (error) {
+            console.error('Error loading templates:', error);
+            this.showAlert('Erro ao carregar templates', 'danger');
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    displayTemplatesTable(data) {
+        const templatesSection = document.getElementById('templates-section');
+        if (!templatesSection) return;
+
+        const templates = data.templates || [];
+        const pagination = data.pagination || {};
+
+        templatesSection.innerHTML = `
+            <h2>Gerenciamento de Templates</h2>
+            
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <button class="btn btn-success" onclick="app.showCreateTemplateModal()">
+                        <i class="fas fa-plus me-1"></i>Novo Template
+                    </button>
+                    <button class="btn btn-primary ms-2" onclick="app.loadTemplates()">
+                        <i class="fas fa-sync me-1"></i>Atualizar
+                    </button>
+                </div>
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="template-search" placeholder="Buscar templates...">
+                        <button class="btn btn-outline-secondary" onclick="app.searchTemplates()">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Categoria</th>
+                                    <th>Descrição</th>
+                                    <th>Uso</th>
+                                    <th>Status</th>
+                                    <th>Atualizado</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${templates.map(template => `
+                                    <tr>
+                                        <td>
+                                            <div class="fw-bold">${template.name}</div>
+                                            <small class="text-muted">${template.subject_template}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">${template.category}</span>
+                                        </td>
+                                        <td>
+                                            <div class="text-truncate" style="max-width: 200px;" title="${template.description}">
+                                                ${template.description || 'Sem descrição'}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">${template.usage_count} usos</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-${template.is_active ? 'success' : 'secondary'}">
+                                                ${template.is_active ? 'Ativo' : 'Inativo'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <small>${new Date(template.updated_at || template.created_at).toLocaleDateString('pt-BR')}</small>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-primary" onclick="app.showTemplateDetail(${template.id})">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button class="btn btn-outline-warning" onclick="app.editTemplate(${template.id})">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-outline-${template.is_active ? 'secondary' : 'success'}" 
+                                                        onclick="app.toggleTemplate(${template.id})">
+                                                    <i class="fas fa-${template.is_active ? 'pause' : 'play'}"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    ${this.createPagination(pagination, 'loadTemplates')}
+                </div>
+            </div>
+        `;
     }
 
     async loadAdmin() {
@@ -937,6 +1185,200 @@ class GmailAIAgent {
                 setTimeout(() => this.loadAdmin(), 1000);
             }
         }
+    }
+
+    // Response management functions
+    async showResponseDetail(responseId) {
+        try {
+            const response = await this.apiCall(`/api/responses/${responseId}`);
+            
+            const modalHtml = `
+                <div class="modal fade" id="responseDetailModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Detalhes da Resposta #${response.id}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <strong>Status:</strong> 
+                                        <span class="badge bg-${this.getStatusColor(response.status)}">${response.status}</span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Confiança:</strong> ${Math.round(response.generation_confidence * 100)}%
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <strong>Email Original:</strong><br>
+                                        <small>De: ${response.email.sender_name} <${response.email.sender_email}></small><br>
+                                        <small>Assunto: ${response.email.subject}</small>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <strong>Assunto da Resposta:</strong>
+                                    <div class="form-control">${response.subject}</div>
+                                </div>
+                                <div class="mb-3">
+                                    <strong>Conteúdo da Resposta:</strong>
+                                    <div class="form-control" style="height: 200px; overflow-y: auto;">${response.body_text}</div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                ${response.status === 'draft' ? `
+                                    <button type="button" class="btn btn-success" onclick="app.approveResponse(${response.id})">
+                                        <i class="fas fa-check me-1"></i>Aprovar
+                                    </button>
+                                ` : ''}
+                                ${response.status === 'approved' ? `
+                                    <button type="button" class="btn btn-info" onclick="app.sendResponse(${response.id})">
+                                        <i class="fas fa-paper-plane me-1"></i>Enviar
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const existingModal = document.getElementById('responseDetailModal');
+            if (existingModal) existingModal.remove();
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('responseDetailModal'));
+            modal.show();
+
+        } catch (error) {
+            console.error('Error loading response detail:', error);
+            this.showAlert('Erro ao carregar detalhes da resposta', 'danger');
+        }
+    }
+
+    async approveResponse(responseId) {
+        try {
+            await this.apiCall(`/api/responses/${responseId}/approve`, 'POST', {
+                approved_by: 'admin'
+            });
+            
+            this.showAlert('Resposta aprovada com sucesso!', 'success');
+            this.loadResponses();
+            
+            // Close modal if open
+            const modal = bootstrap.Modal.getInstance(document.getElementById('responseDetailModal'));
+            if (modal) modal.hide();
+
+        } catch (error) {
+            console.error('Error approving response:', error);
+            this.showAlert('Erro ao aprovar resposta', 'danger');
+        }
+    }
+
+    async sendResponse(responseId) {
+        try {
+            await this.apiCall(`/api/responses/${responseId}/send`, 'POST');
+            
+            this.showAlert('Resposta enviada com sucesso!', 'success');
+            this.loadResponses();
+            
+            // Close modal if open
+            const modal = bootstrap.Modal.getInstance(document.getElementById('responseDetailModal'));
+            if (modal) modal.hide();
+
+        } catch (error) {
+            console.error('Error sending response:', error);
+            this.showAlert('Erro ao enviar resposta', 'danger');
+        }
+    }
+
+    // Template management functions
+    async showTemplateDetail(templateId) {
+        try {
+            const template = await this.apiCall(`/api/templates/${templateId}`);
+            
+            const modalHtml = `
+                <div class="modal fade" id="templateDetailModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Template: ${template.name}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <strong>Categoria:</strong> <span class="badge bg-secondary">${template.category}</span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Uso:</strong> <span class="badge bg-info">${template.usage_count} vezes</span>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <strong>Descrição:</strong>
+                                    <div>${template.description || 'Sem descrição'}</div>
+                                </div>
+                                <div class="mb-3">
+                                    <strong>Assunto:</strong>
+                                    <div class="form-control">${template.subject_template}</div>
+                                </div>
+                                <div class="mb-3">
+                                    <strong>Conteúdo:</strong>
+                                    <div class="form-control" style="height: 200px; overflow-y: auto;">${template.body_template}</div>
+                                </div>
+                                <div class="mb-3">
+                                    <strong>Variáveis:</strong>
+                                    <div>${template.variables.map(v => `<span class="badge bg-light text-dark me-1">{{${v}}}</span>`).join('')}</div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                                <button type="button" class="btn btn-warning" onclick="app.editTemplate(${template.id})">
+                                    <i class="fas fa-edit me-1"></i>Editar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const existingModal = document.getElementById('templateDetailModal');
+            if (existingModal) existingModal.remove();
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('templateDetailModal'));
+            modal.show();
+
+        } catch (error) {
+            console.error('Error loading template detail:', error);
+            this.showAlert('Erro ao carregar detalhes do template', 'danger');
+        }
+    }
+
+    async toggleTemplate(templateId) {
+        try {
+            await this.apiCall(`/api/templates/${templateId}/toggle`, 'POST');
+            
+            this.showAlert('Status do template alterado com sucesso!', 'success');
+            this.loadTemplates();
+
+        } catch (error) {
+            console.error('Error toggling template:', error);
+            this.showAlert('Erro ao alterar status do template', 'danger');
+        }
+    }
+
+    showCreateTemplateModal() {
+        this.showAlert('Funcionalidade de criação de templates em desenvolvimento', 'info');
+    }
+
+    editTemplate(templateId) {
+        this.showAlert('Funcionalidade de edição de templates em desenvolvimento', 'info');
+    }
+
+    searchTemplates() {
+        this.showAlert('Funcionalidade de busca de templates em desenvolvimento', 'info');
     }
 }
 

@@ -131,11 +131,15 @@ def create_app(config_name=None):
     from app.api.dashboard_routes import dashboard_bp
     from app.api.admin_routes import admin_bp
     from app.api.learning_routes import learning_bp
+    from app.api.response_routes import response_bp
+    from app.api.template_routes import template_bp
     
     app.register_blueprint(email_bp, url_prefix='/api/emails')
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(learning_bp, url_prefix='/api/learning')
+    app.register_blueprint(response_bp, url_prefix='/api/responses')
+    app.register_blueprint(template_bp, url_prefix='/api/templates')
     
     # Register main routes
     from app.routes import main_bp
