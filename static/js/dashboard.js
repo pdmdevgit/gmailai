@@ -818,6 +818,13 @@ class GmailAIAgent {
 
     // Utility methods
     async apiCall(url, method = 'GET', data = null) {
+        // Ensure HTTPS URLs for API calls
+        const baseUrl = window.location.protocol === 'https:' ? 
+            `https://${window.location.host}` : 
+            `http://${window.location.host}`;
+        
+        const fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : url;
+        
         const options = {
             method,
             headers: {
@@ -829,7 +836,7 @@ class GmailAIAgent {
             options.body = JSON.stringify(data);
         }
 
-        const response = await fetch(url, options);
+        const response = await fetch(fullUrl, options);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
