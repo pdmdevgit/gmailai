@@ -543,16 +543,19 @@ def gmail_oauth_callback():
             state=state
         )
         
-        # Set redirect URI - use HTTPS in production
-        if request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https' or 'devpdm.com' in request.host:
-            redirect_uri = f"https://{request.host}/api/admin/gmail/callback"
-        else:
-            redirect_uri = f"{request.host_url}api/admin/gmail/callback"
-        
+        # Force HTTPS for production environment
+        import os
+        os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+        redirect_uri = f"https://{request.host}/api/admin/gmail/callback"
         flow.redirect_uri = redirect_uri
         
+        # Force HTTPS in authorization response URL
+        auth_response_url = request.url
+        if auth_response_url.startswith('http://'):
+            auth_response_url = auth_response_url.replace('http://', 'https://', 1)
+        
         # Exchange authorization code for credentials
-        flow.fetch_token(authorization_response=request.url)
+        flow.fetch_token(authorization_response=auth_response_url)
         
         # Save credentials
         token_dir = current_app.config.get('GMAIL_TOKEN_DIR')
