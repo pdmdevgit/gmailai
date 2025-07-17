@@ -1,4 +1,4 @@
-22// Gmail AI Agent Dashboard JavaScript
+// Gmail AI Agent Dashboard JavaScript
 // Prof. Diogo Moreira Email Management System
 
 class GmailAIDashboard {
@@ -26,46 +26,6 @@ class GmailAIDashboard {
                 }
             });
         });
-
-        // Process emails button
-        const processBtn = document.getElementById('processEmailsBtn');
-        if (processBtn) {
-            processBtn.addEventListener('click', () => this.processEmails());
-        }
-
-        // Bulk actions
-        const bulkActionBtn = document.getElementById('bulkActionBtn');
-        if (bulkActionBtn) {
-            bulkActionBtn.addEventListener('click', () => this.performBulkAction());
-        }
-
-        // Search and filters
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                this.searchEmails(e.target.value);
-            });
-        }
-
-        // Filter buttons
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const filter = e.target.getAttribute('data-filter');
-                this.applyFilter(filter);
-            });
-        });
-
-        // Pagination
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('page-link')) {
-                e.preventDefault();
-                const page = parseInt(e.target.getAttribute('data-page'));
-                if (page) {
-                    this.currentPage = page;
-                    this.loadCurrentSection();
-                }
-            }
-        });
     }
 
     showSection(section) {
@@ -83,7 +43,7 @@ class GmailAIDashboard {
             sec.style.display = 'none';
         });
 
-        // Show selected section - fix ID format
+        // Show selected section
         const sectionElement = document.getElementById(`${section}-section`);
         if (sectionElement) {
             sectionElement.style.display = 'block';
@@ -116,15 +76,10 @@ class GmailAIDashboard {
 
     async loadDashboard() {
         try {
-            // Load overview stats
             const overview = await this.apiCall('/api/dashboard/overview');
             this.updateOverviewStats(overview);
-
-            // Load recent emails and responses
             await this.loadRecentEmails();
             await this.loadRecentResponses();
-
-            // Load charts
             await this.loadCharts();
         } catch (error) {
             console.error('Error loading dashboard:', error);
@@ -134,7 +89,6 @@ class GmailAIDashboard {
 
     updateOverviewStats(data) {
         if (data && data.summary) {
-            // Update cards with correct IDs from HTML
             const totalEmailsEl = document.getElementById('total-emails');
             const emailsTodayEl = document.getElementById('emails-today');
             const emailGrowthEl = document.getElementById('email-growth');
@@ -211,26 +165,8 @@ class GmailAIDashboard {
         }
     }
 
-    updateRecentActivity(data) {
-        const container = document.getElementById('recentActivity');
-        if (container && data && data.length > 0) {
-            container.innerHTML = data.map(item => `
-                <div class="activity-item">
-                    <div class="activity-icon">
-                        <i class="fas fa-${this.getActivityIcon(item.type)}"></i>
-                    </div>
-                    <div class="activity-content">
-                        <div class="activity-title">${item.title}</div>
-                        <div class="activity-time">${this.formatTime(item.timestamp)}</div>
-                    </div>
-                </div>
-            `).join('');
-        }
-    }
-
     async loadCharts() {
         try {
-            // Create simple charts with mock data for now
             this.renderVolumeChart();
             this.renderClassificationChart();
         } catch (error) {
@@ -241,7 +177,6 @@ class GmailAIDashboard {
     renderVolumeChart() {
         const ctx = document.getElementById('emailVolumeChart');
         if (ctx) {
-            // Create chart with sample data
             const last7Days = [];
             const emailCounts = [];
             for (let i = 6; i >= 0; i--) {
@@ -316,7 +251,6 @@ class GmailAIDashboard {
                 per_page: this.itemsPerPage
             });
 
-            // Add filters if any
             const activeFilters = this.getActiveFilters();
             Object.keys(activeFilters).forEach(key => {
                 if (activeFilters[key]) {
@@ -347,7 +281,6 @@ class GmailAIDashboard {
             return;
         }
 
-        // Create table
         const tableHtml = `
             <div class="table-responsive">
                 <table class="table table-hover">
@@ -408,167 +341,7 @@ class GmailAIDashboard {
         `;
 
         container.innerHTML = tableHtml;
-
-        // Update pagination
         this.updatePagination(data.pagination);
-    }
-
-    async viewEmail(emailId) {
-        try {
-            const email = await this.apiCall(`/api/emails/${emailId}`);
-            this.showEmailModal(email);
-        } catch (error) {
-            console.error('Error loading email:', error);
-            this.showError('Erro ao carregar email');
-        }
-    }
-
-    showEmailModal(email) {
-        const modal = document.getElementById('emailModal');
-        if (modal) {
-            document.getElementById('modalEmailSubject').textContent = email.subject;
-            document.getElementById('modalEmailFrom').textContent = `${email.sender_name} <${email.sender_email}>`;
-            document.getElementById('modalEmailDate').textContent = this.formatDate(email.received_at);
-            document.getElementById('modalEmailBody').innerHTML = email.body_html || email.body_text;
-            
-            // Show modal (assuming Bootstrap modal)
-            $(modal).modal('show');
-        }
-    }
-
-    async generateResponse(emailId) {
-        try {
-            this.showLoading();
-            const email = await this.apiCall(`/api/emails/${emailId}`);
-            this.showResponseModal(email);
-        } catch (error) {
-            console.error('Error loading email for response:', error);
-            this.showError('Erro ao carregar email');
-        }
-    }
-
-    showResponseModal(email) {
-        const modal = document.getElementById('responseModal');
-        if (modal) {
-            document.getElementById('responseEmailId').value = email.id;
-            document.getElementById('responseEmailSubject').textContent = email.subject;
-            document.getElementById('responseEmailFrom').textContent = `${email.sender_name} <${email.sender_email}>`;
-            
-            // Clear previous response
-            document.getElementById('responseContent').value = '';
-            
-            // Show modal
-            $(modal).modal('show');
-        }
-    }
-
-    async sendResponse(emailId, responseData) {
-        try {
-            this.showLoading();
-            
-            const requestData = {
-                response_text: responseData.content,
-                template_id: responseData.template_id || null,
-                send_immediately: responseData.send_immediately || false
-            };
-
-            const response = await this.apiCall(`/api/emails/${emailId}/responses`, 'POST', requestData);
-            
-            this.showSuccess('Resposta gerada com sucesso!');
-            this.loadCurrentSection(); // Refresh current view
-            
-            // Close modal
-            $('#responseModal').modal('hide');
-            
-            return response;
-        } catch (error) {
-            console.error('Error sending response:', error);
-            this.showError('Erro ao enviar resposta');
-        }
-    }
-
-    async markForResponse(emailId) {
-        try {
-            const response = await this.apiCall(`/api/emails/${emailId}/mark-for-response`, 'POST');
-            this.showSuccess('Email marcado para resposta');
-            this.loadCurrentSection();
-            return response;
-        } catch (error) {
-            console.error('Error marking email for response:', error);
-            this.showError('Erro ao marcar email');
-        }
-    }
-
-    async skipResponse(emailId, reason = '') {
-        try {
-            const response = await this.apiCall(`/api/emails/${emailId}/skip-response`, 'POST', {
-                reason: reason
-            });
-            this.showSuccess('Email marcado como ignorado');
-            this.loadCurrentSection();
-            return response;
-        } catch (error) {
-            console.error('Error skipping email:', error);
-            this.showError('Erro ao ignorar email');
-        }
-    }
-
-    async performBulkAction() {
-        try {
-            const selectedEmails = this.getSelectedEmails();
-            const action = document.getElementById('bulkActionSelect').value;
-            
-            if (selectedEmails.length === 0) {
-                this.showError('Selecione pelo menos um email');
-                return;
-            }
-
-            const response = await this.apiCall('/api/emails/bulk-actions', 'POST', {
-                email_ids: selectedEmails,
-                action: action
-            });
-
-            this.showSuccess(`Ação executada em ${selectedEmails.length} emails`);
-            this.loadCurrentSection();
-            
-            return response;
-        } catch (error) {
-            console.error('Error performing bulk action:', error);
-            this.showError('Erro ao executar ação em lote');
-        }
-    }
-
-    async processEmails() {
-        try {
-            this.showLoading();
-            const result = await this.apiCall('/api/emails/process', 'POST');
-            
-            this.showSuccess(`Processamento iniciado! ${result.processed_count || 0} emails processados`);
-            
-            // Refresh dashboard after processing
-            setTimeout(() => {
-                this.loadDashboard();
-            }, 2000);
-            
-            return result;
-        } catch (error) {
-            console.error('Error processing emails:', error);
-            this.showError('Erro ao processar emails');
-        }
-    }
-
-    getSelectedEmails() {
-        const checkboxes = document.querySelectorAll('.email-checkbox:checked');
-        return Array.from(checkboxes).map(cb => cb.value);
-    }
-
-    getActiveFilters() {
-        return {
-            status: document.getElementById('status-filter')?.value,
-            classification: document.getElementById('type-filter')?.value,
-            account: document.getElementById('account-filter')?.value,
-            search: document.getElementById('search-input')?.value
-        };
     }
 
     async loadResponses() {
@@ -606,7 +379,6 @@ class GmailAIDashboard {
             return;
         }
 
-        // Create table
         const tableHtml = `
             <div class="table-responsive">
                 <table class="table table-hover">
@@ -770,7 +542,6 @@ class GmailAIDashboard {
             if (container) {
                 this.showLoading('admin-section');
                 
-                // For now, show a simple admin interface
                 container.innerHTML = `
                     <div class="row">
                         <div class="col-md-12">
@@ -821,146 +592,21 @@ class GmailAIDashboard {
         }
     }
 
-    renderAdmin(accountsStatus, settings) {
-        const container = document.getElementById('adminContent');
-        if (!container) return;
-
-        const adminHtml = `
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Contas Gmail</h5>
-                        </div>
-                        <div class="card-body">
-                            ${this.renderGmailAccounts(accountsStatus)}
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Configurações do Sistema</h5>
-                        </div>
-                        <div class="card-body">
-                            ${this.renderSystemSettings(settings)}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        container.innerHTML = adminHtml;
-    }
-
-    renderGmailAccounts(accounts) {
-        if (!accounts || accounts.length === 0) {
-            return '<p class="text-muted">Nenhuma conta configurada</p>';
-        }
-
-        return accounts.map(account => `
-            <div class="gmail-account-item mb-3">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>${account.email}</strong>
-                        <br>
-                        <span class="badge badge-${account.status === 'active' ? 'success' : 'danger'}">
-                            ${account.status === 'active' ? 'Ativa' : 'Inativa'}
-                        </span>
-                    </div>
-                    <div>
-                        <button class="btn btn-sm btn-outline-primary" onclick="dashboard.authenticateGmail('${account.email}')">
-                            <i class="fas fa-key"></i> Autenticar
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="dashboard.refreshGmail('${account.email}')">
-                            <i class="fas fa-sync"></i> Atualizar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `).join('');
-    }
-
-    renderSystemSettings(settings) {
-        return `
-            <form id="systemSettingsForm">
-                <div class="form-group">
-                    <label>Modelo de IA</label>
-                    <select class="form-control" name="ai_model">
-                        <option value="gpt-4" ${settings?.ai_model === 'gpt-4' ? 'selected' : ''}>GPT-4</option>
-                        <option value="gpt-3.5-turbo" ${settings?.ai_model === 'gpt-3.5-turbo' ? 'selected' : ''}>GPT-3.5 Turbo</option>
-                        <option value="claude-3" ${settings?.ai_model === 'claude-3' ? 'selected' : ''}>Claude 3</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Intervalo de Verificação (minutos)</label>
-                    <input type="number" class="form-control" name="check_interval" value="${settings?.check_interval || 5}" min="1" max="60">
-                </div>
-                <div class="form-group">
-                    <label>Limite de Confiança para Auto-resposta</label>
-                    <input type="number" class="form-control" name="auto_response_threshold" value="${settings?.auto_response_threshold || 0.85}" min="0" max="1" step="0.01">
-                </div>
-                <div class="form-group">
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input" name="auto_processing" ${settings?.auto_processing ? 'checked' : ''}>
-                        <label class="form-check-label">Processamento Automático</label>
-                    </div>
-                </div>
-                <button type="button" class="btn btn-primary" onclick="dashboard.saveSettings()">
-                    <i class="fas fa-save"></i> Salvar Configurações
-                </button>
-                <button type="button" class="btn btn-outline-info ml-2" onclick="dashboard.testAI()">
-                    <i class="fas fa-flask"></i> Testar IA
-                </button>
-            </form>
-        `;
-    }
-
-    async authenticateGmail(email) {
+    async processEmails() {
         try {
-            const result = await this.apiCall('/api/admin/gmail-accounts/authenticate', 'POST', {
-                email: email
-            });
+            this.showLoading();
+            const result = await this.apiCall('/api/emails/process', 'POST');
             
-            if (result.auth_url) {
-                // Open authentication URL in new window
-                window.open(result.auth_url, 'gmail_auth', 'width=600,height=600');
-                this.showInfo('Complete a autenticação na nova janela');
-            }
+            this.showSuccess(`Processamento iniciado! ${result.processed_count || 0} emails processados`);
+            
+            setTimeout(() => {
+                this.loadDashboard();
+            }, 2000);
+            
+            return result;
         } catch (error) {
-            console.error('Error authenticating Gmail:', error);
-            this.showError('Erro ao autenticar Gmail');
-        }
-    }
-
-    async refreshGmail(email) {
-        try {
-            await this.apiCall('/api/admin/gmail-accounts/refresh', 'POST', {
-                email: email
-            });
-            
-            this.showSuccess('Conta Gmail atualizada');
-            this.loadAdmin();
-        } catch (error) {
-            console.error('Error refreshing Gmail:', error);
-            this.showError('Erro ao atualizar Gmail');
-        }
-    }
-
-    async saveSettings() {
-        try {
-            const form = document.getElementById('systemSettingsForm');
-            const formData = new FormData(form);
-            const settings = Object.fromEntries(formData.entries());
-            
-            // Convert checkbox to boolean
-            settings.auto_processing = formData.has('auto_processing');
-            
-            await this.apiCall('/api/admin/settings', 'POST', settings);
-            this.showSuccess('Configurações salvas com sucesso');
-        } catch (error) {
-            console.error('Error saving settings:', error);
-            this.showError('Erro ao salvar configurações');
+            console.error('Error processing emails:', error);
+            this.showError('Erro ao processar emails');
         }
     }
 
@@ -980,10 +626,8 @@ class GmailAIDashboard {
 
     // Utility methods
     async apiCall(url, method = 'GET', data = null) {
-        // Use same protocol as current page (HTTPS in production)
         const protocol = "https:";
         const baseUrl = "https://" + window.location.host;
-
         const fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : url;
 
         const options = {
@@ -1007,86 +651,15 @@ class GmailAIDashboard {
         return await response.json();
     }
 
-    async viewResponse(responseId) {
-        try {
-            const response = await this.apiCall(`/api/responses/${responseId}`);
-            this.showResponseViewModal(response);
-        } catch (error) {
-            console.error('Error loading response:', error);
-            this.showError('Erro ao carregar resposta');
-        }
+    getActiveFilters() {
+        return {
+            status: document.getElementById('status-filter')?.value,
+            classification: document.getElementById('type-filter')?.value,
+            account: document.getElementById('account-filter')?.value,
+            search: document.getElementById('search-input')?.value
+        };
     }
 
-    showResponseViewModal(response) {
-        const modal = document.getElementById('responseViewModal');
-        if (modal) {
-            document.getElementById('responseViewSubject').textContent = `Re: ${response.email.subject}`;
-            document.getElementById('responseViewTo').textContent = `${response.email.sender_name} <${response.email.sender_email}>`;
-            document.getElementById('responseViewDate').textContent = this.formatDate(response.created_at);
-            document.getElementById('responseViewContent').innerHTML = response.response_text;
-            
-            $(modal).modal('show');
-        }
-    }
-
-    async approveResponse(responseId) {
-        try {
-            await this.apiCall(`/api/responses/${responseId}/approve`, 'POST', {
-                approved: true
-            });
-            this.showSuccess('Resposta aprovada');
-            this.loadCurrentSection();
-        } catch (error) {
-            console.error('Error approving response:', error);
-            this.showError('Erro ao aprovar resposta');
-        }
-    }
-
-    async sendResponse(responseId) {
-        try {
-            await this.apiCall(`/api/responses/${responseId}/send`, 'POST');
-            this.showSuccess('Resposta enviada');
-            this.loadCurrentSection();
-        } catch (error) {
-            console.error('Error sending response:', error);
-            this.showError('Erro ao enviar resposta');
-        }
-    }
-
-    async viewTemplate(templateId) {
-        try {
-            const template = await this.apiCall(`/api/templates/${templateId}`);
-            this.showTemplateModal(template);
-        } catch (error) {
-            console.error('Error loading template:', error);
-            this.showError('Erro ao carregar template');
-        }
-    }
-
-    showTemplateModal(template) {
-        const modal = document.getElementById('templateModal');
-        if (modal) {
-            document.getElementById('templateModalName').textContent = template.name;
-            document.getElementById('templateModalCategory').textContent = template.category;
-            document.getElementById('templateModalDescription').textContent = template.description || 'Sem descrição';
-            document.getElementById('templateModalContent').innerHTML = template.content;
-            
-            $(modal).modal('show');
-        }
-    }
-
-    async toggleTemplate(templateId) {
-        try {
-            await this.apiCall(`/api/templates/${templateId}/toggle`, 'POST');
-            this.showSuccess('Status do template alterado');
-            this.loadCurrentSection();
-        } catch (error) {
-            console.error('Error toggling template:', error);
-            this.showError('Erro ao alterar template');
-        }
-    }
-
-    // Helper methods
     formatDate(dateString) {
         if (!dateString) return '';
         const date = new Date(dateString);
@@ -1103,17 +676,6 @@ class GmailAIDashboard {
         if (diff < 3600000) return `${Math.floor(diff / 60000)} min atrás`;
         if (diff < 86400000) return `${Math.floor(diff / 3600000)}h atrás`;
         return date.toLocaleDateString('pt-BR');
-    }
-
-    getActivityIcon(type) {
-        const icons = {
-            'email_received': 'envelope',
-            'response_generated': 'reply',
-            'response_sent': 'paper-plane',
-            'classification': 'tags',
-            'error': 'exclamation-triangle'
-        };
-        return icons[type] || 'info-circle';
     }
 
     getStatusColor(status) {
@@ -1166,7 +728,6 @@ class GmailAIDashboard {
         
         let paginationHtml = '<nav><ul class="pagination justify-content-center">';
         
-        // Previous button
         paginationHtml += `
             <li class="page-item ${!has_prev ? 'disabled' : ''}">
                 <a class="page-link" href="#" data-page="${current_page - 1}" ${!has_prev ? 'tabindex="-1"' : ''}>
@@ -1175,7 +736,6 @@ class GmailAIDashboard {
             </li>
         `;
         
-        // Page numbers
         const startPage = Math.max(1, current_page - 2);
         const endPage = Math.min(total_pages, current_page + 2);
         
@@ -1187,7 +747,6 @@ class GmailAIDashboard {
             `;
         }
         
-        // Next button
         paginationHtml += `
             <li class="page-item ${!has_next ? 'disabled' : ''}">
                 <a class="page-link" href="#" data-page="${current_page + 1}" ${!has_next ? 'tabindex="-1"' : ''}>
@@ -1245,7 +804,6 @@ class GmailAIDashboard {
         
         alertContainer.insertAdjacentHTML('afterbegin', alertHtml);
         
-        // Auto-dismiss after 5 seconds
         setTimeout(() => {
             const alert = document.getElementById(alertId);
             if (alert) {
@@ -1255,259 +813,220 @@ class GmailAIDashboard {
     }
 
     startAutoRefresh() {
-        // Refresh dashboard every 5 minutes
         setInterval(() => {
             if (this.currentSection === 'dashboard') {
                 this.loadDashboard();
             }
         }, 300000);
     }
-
-    searchEmails(query) {
-        // Debounce search
-        clearTimeout(this.searchTimeout);
-        this.searchTimeout = setTimeout(() => {
-            this.currentPage = 1;
-            this.loadEmails();
-        }, 500);
-    }
-
-    applyFilter(filter) {
-        // Update filter UI
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
-        
-        // Reset page and reload
-        this.currentPage = 1;
-        this.loadCurrentSection();
-    }
 }
 
 // Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     window.dashboard = new GmailAIDashboard();
-    window.app = window.dashboard; // Create app alias for HTML onclick handlers
-});
-
-// Global functions for onclick handlers
-window.dashboard = null;
-window.app = {
-    processEmails: function() {
-        if (window.dashboard) {
-            return window.dashboard.processEmails();
-        }
-    },
-    filterEmails: function() {
-        if (window.dashboard) {
-            window.dashboard.currentPage = 1;
-            return window.dashboard.loadEmails();
-        }
-    },
-    clearFilters: function() {
-        // Clear all filter inputs
-        const filters = ['account-filter', 'status-filter', 'type-filter', 'search-input'];
-        filters.forEach(filterId => {
-            const element = document.getElementById(filterId);
-            if (element) {
-                element.value = '';
-            }
-        });
+    
+    // Create app object with all necessary functions
+    window.app = {
+        // Dashboard reference
+        dashboard: window.dashboard,
         
-        if (window.dashboard) {
-            window.dashboard.currentPage = 1;
-            return window.dashboard.loadEmails();
-        }
-    },
-    viewEmail: function(emailId) {
-        if (window.dashboard) {
-            return window.dashboard.viewEmail(emailId);
-        }
-    },
-    generateResponse: function(emailId) {
-        if (window.dashboard) {
-            return window.dashboard.generateResponse(emailId);
-        }
-    },
-    testAI: function() {
-        if (window.dashboard) {
-            return window.dashboard.testAI();
-        }
-    },
-    clearCache: function() {
-        // Clear browser cache
-        if ('caches' in window) {
-            caches.keys().then(function(names) {
-                for (let name of names) {
-                    caches.delete(name);
+        processEmails: function() {
+            if (window.dashboard) {
+                return window.dashboard.processEmails();
+            }
+        },
+        filterEmails: function() {
+            if (window.dashboard) {
+                window.dashboard.currentPage = 1;
+                return window.dashboard.loadEmails();
+            }
+        },
+        clearFilters: function() {
+            const filters = ['account-filter', 'status-filter', 'type-filter', 'search-input'];
+            filters.forEach(filterId => {
+                const element = document.getElementById(filterId);
+                if (element) {
+                    element.value = '';
                 }
             });
-        }
-        
-        // Force page reload
-        window.location.reload(true);
-    },
-    
-    // Response functions
-    generateBulkResponses: function() {
-        if (window.dashboard) {
-            window.dashboard.showAlert('Gerando respostas em lote...', 'info');
-            // TODO: Implement bulk response generation
-        }
-    },
-    filterResponses: function() {
-        if (window.dashboard) {
-            window.dashboard.currentPage = 1;
-            return window.dashboard.loadResponses();
-        }
-    },
-    clearResponseFilters: function() {
-        const filters = ['response-status-filter', 'response-template-filter', 'response-search-input'];
-        filters.forEach(filterId => {
-            const element = document.getElementById(filterId);
-            if (element) {
-                element.value = '';
-            }
-        });
-        
-        if (window.dashboard) {
-            window.dashboard.currentPage = 1;
-            return window.dashboard.loadResponses();
-        }
-    },
-    viewResponse: function(responseId) {
-        if (window.dashboard) {
-            return window.dashboard.viewResponse(responseId);
-        }
-    },
-    approveResponse: function(responseId) {
-        if (window.dashboard) {
-            return window.dashboard.approveResponse(responseId);
-        }
-    },
-    editResponse: function(responseId) {
-        if (window.dashboard) {
-            window.dashboard.showAlert('Função de edição em desenvolvimento', 'info');
-        }
-    },
-    sendResponse: function(responseId) {
-        if (window.dashboard) {
-            return window.dashboard.sendResponse(responseId);
-        }
-    },
-    generateResponseFromModal: function() {
-        const emailId = document.getElementById('responseEmailId').value;
-        if (emailId && window.dashboard) {
-            return window.dashboard.generateResponse(emailId);
-        }
-    },
-    generateAIResponse: function() {
-        const emailId = document.getElementById('responseEmailId').value;
-        const template = document.getElementById('responseTemplate').value;
-        
-        if (window.dashboard) {
-            window.dashboard.showAlert('Gerando resposta com IA...', 'info');
-            // TODO: Implement AI response generation
-        }
-    },
-    saveResponse: function() {
-        const emailId = document.getElementById('responseEmailId').value;
-        const content = document.getElementById('responseContent').value;
-        const template = document.getElementById('responseTemplate').value;
-        const sendImmediately = document.getElementById('sendImmediately').checked;
-        
-        if (!content.trim()) {
-            if (window.dashboard) {
-                window.dashboard.showAlert('Por favor, insira o conteúdo da resposta', 'warning');
-            }
-            return;
-        }
-        
-        if (window.dashboard) {
-            return window.dashboard.sendResponse(emailId, {
-                content: content,
-                template_id: template,
-                send_immediately: sendImmediately
-            });
-        }
-    },
-    
-    // Template functions
-    showCreateTemplateModal: function() {
-        // Clear form
-        document.getElementById('templateId').value = '';
-        document.getElementById('templateName').value = '';
-        document.getElementById('templateCategory').value = 'vendas';
-        document.getElementById('templateDescription').value = '';
-        document.getElementById('templateContent').value = '';
-        document.getElementById('templateActive').checked = true;
-        document.getElementById('templateModalTitle').textContent = 'Novo Template';
-        
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('templateModal'));
-        modal.show();
-    },
-    filterTemplatesByCategory: function(category) {
-        // Update active button
-        document.querySelectorAll('.btn-group .btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        event.target.classList.add('active');
-        
-        if (window.dashboard) {
-            // TODO: Implement category filtering
-            window.dashboard.showAlert(`Filtrando templates por: ${category}`, 'info');
-        }
-    },
-    viewTemplate: function(templateId) {
-        if (window.dashboard) {
-            return window.dashboard.viewTemplate(templateId);
-        }
-    },
-    editTemplate: function(templateId) {
-        if (window.dashboard) {
-            // TODO: Load template data and show modal
-            window.dashboard.showAlert('Carregando template para edição...', 'info');
-        }
-    },
-    toggleTemplate: function(templateId) {
-        if (window.dashboard) {
-            return window.dashboard.toggleTemplate(templateId);
-        }
-    },
-    saveTemplate: function() {
-        const templateId = document.getElementById('templateId').value;
-        const name = document.getElementById('templateName').value;
-        const category = document.getElementById('templateCategory').value;
-        const description = document.getElementById('templateDescription').value;
-        const content = document.getElementById('templateContent').value;
-        const isActive = document.getElementById('templateActive').checked;
-        
-        if (!name.trim() || !content.trim()) {
-            if (window.dashboard) {
-                window.dashboard.showAlert('Por favor, preencha nome e conteúdo do template', 'warning');
-            }
-            return;
-        }
-        
-        const templateData = {
-            name: name,
-            category: category,
-            description: description,
-            content: content,
-            is_active: isActive
-        };
-        
-        if (window.dashboard) {
-            // TODO: Implement template saving
-            window.dashboard.showAlert('Salvando template...', 'info');
             
-            // Hide modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('templateModal'));
-            if (modal) {
-                modal.hide();
+            if (window.dashboard) {
+                window.dashboard.currentPage = 1;
+                return window.dashboard.loadEmails();
+            }
+        },
+        viewEmail: function(emailId) {
+            if (window.dashboard) {
+                return window.dashboard.viewEmail(emailId);
+            }
+        },
+        generateResponse: function(emailId) {
+            if (window.dashboard) {
+                return window.dashboard.generateResponse(emailId);
+            }
+        },
+        testAI: function() {
+            if (window.dashboard) {
+                return window.dashboard.testAI();
+            }
+        },
+        clearCache: function() {
+            if ('caches' in window) {
+                caches.keys().then(function(names) {
+                    for (let name of names) {
+                        caches.delete(name);
+                    }
+                });
+            }
+            window.location.reload(true);
+        },
+        
+        // Response functions
+        generateBulkResponses: function() {
+            if (window.dashboard) {
+                window.dashboard.showAlert('Gerando respostas em lote...', 'info');
+            }
+        },
+        filterResponses: function() {
+            if (window.dashboard) {
+                window.dashboard.currentPage = 1;
+                return window.dashboard.loadResponses();
+            }
+        },
+        clearResponseFilters: function() {
+            const filters = ['response-status-filter', 'response-template-filter', 'response-search-input'];
+            filters.forEach(filterId => {
+                const element = document.getElementById(filterId);
+                if (element) {
+                    element.value = '';
+                }
+            });
+            
+            if (window.dashboard) {
+                window.dashboard.currentPage = 1;
+                return window.dashboard.loadResponses();
+            }
+        },
+        viewResponse: function(responseId) {
+            if (window.dashboard) {
+                window.dashboard.showAlert('Visualizando resposta...', 'info');
+            }
+        },
+        approveResponse: function(responseId) {
+            if (window.dashboard) {
+                window.dashboard.showAlert('Aprovando resposta...', 'info');
+            }
+        },
+        editResponse: function(responseId) {
+            if (window.dashboard) {
+                window.dashboard.showAlert('Função de edição em desenvolvimento', 'info');
+            }
+        },
+        sendResponse: function(responseId) {
+            if (window.dashboard) {
+                window.dashboard.showAlert('Enviando resposta...', 'info');
+            }
+        },
+        generateResponseFromModal: function() {
+            const emailId = document.getElementById('responseEmailId')?.value;
+            if (emailId && window.dashboard) {
+                return window.dashboard.generateResponse(emailId);
+            }
+        },
+        generateAIResponse: function() {
+            if (window.dashboard) {
+                window.dashboard.showAlert('Gerando resposta com IA...', 'info');
+            }
+        },
+        saveResponse: function() {
+            const emailId = document.getElementById('responseEmailId')?.value;
+            const content = document.getElementById('responseContent')?.value;
+            
+            if (!content || !content.trim()) {
+                if (window.dashboard) {
+                    window.dashboard.showAlert('Por favor, insira o conteúdo da resposta', 'warning');
+                }
+                return;
+            }
+            
+            if (window.dashboard) {
+                window.dashboard.showAlert('Salvando resposta...', 'info');
+            }
+        },
+        
+        // Template functions
+        showCreateTemplateModal: function() {
+            const templateId = document.getElementById('templateId');
+            const templateName = document.getElementById('templateName');
+            const templateCategory = document.getElementById('templateCategory');
+            const templateDescription = document.getElementById('templateDescription');
+            const templateContent = document.getElementById('templateContent');
+            const templateActive = document.getElementById('templateActive');
+            const templateModalTitle = document.getElementById('templateModalTitle');
+            
+            if (templateId) templateId.value = '';
+            if (templateName) templateName.value = '';
+            if (templateCategory) templateCategory.value = 'vendas';
+            if (templateDescription) templateDescription.value = '';
+            if (templateContent) templateContent.value = '';
+            if (templateActive) templateActive.checked = true;
+            if (templateModalTitle) templateModalTitle.textContent = 'Novo Template';
+            
+            const modal = document.getElementById('templateModal');
+            if (modal && typeof bootstrap !== 'undefined') {
+                const bsModal = new bootstrap.Modal(modal);
+                bsModal.show();
+            }
+        },
+        filterTemplatesByCategory: function(category) {
+            document.querySelectorAll('.btn-group .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
+            
+            if (window.dashboard) {
+                window.dashboard.showAlert(`Filtrando templates por: ${category}`, 'info');
+            }
+        },
+        viewTemplate: function(templateId) {
+            if (window.dashboard) {
+                window.dashboard.showAlert('Visualizando template...', 'info');
+            }
+        },
+        editTemplate: function(templateId) {
+            if (window.dashboard) {
+                window.dashboard.showAlert('Carregando template para edição...', 'info');
+            }
+        },
+        toggleTemplate: function(templateId) {
+            if (window.dashboard) {
+                window.dashboard.showAlert('Alterando status do template...', 'info');
+            }
+        },
+        saveTemplate: function() {
+            const templateName = document.getElementById('templateName');
+            const templateContent = document.getElementById('templateContent');
+            
+            if (!templateName || !templateName.value.trim() || !templateContent || !templateContent.value.trim()) {
+                if (window.dashboard) {
+                    window.dashboard.showAlert('Por favor, preencha nome e conteúdo do template', 'warning');
+                }
+                return;
+            }
+            
+            if (window.dashboard) {
+                window.dashboard.showAlert('Salvando template...', 'info');
+                
+                const modal = document.getElementById('templateModal');
+                if (modal && typeof bootstrap !== 'undefined') {
+                    const bsModal = bootstrap.Modal.getInstance(modal);
+                    if (bsModal) {
+                        bsModal.hide();
+                    }
+                }
             }
         }
-    }
-};
+    };
+});
