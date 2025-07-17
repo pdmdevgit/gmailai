@@ -1,4 +1,4 @@
-// Gmail AI Agent Dashboard JavaScript
+// Gmail AI Agent Dashboard JavaScript - Versão Completa e Corrigida
 // Prof. Diogo Moreira Email Management System
 
 class GmailAIDashboard {
@@ -25,6 +25,18 @@ class GmailAIDashboard {
                     this.showSection(section);
                 }
             });
+        });
+
+        // Pagination
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('page-link')) {
+                e.preventDefault();
+                const page = parseInt(e.target.getAttribute('data-page'));
+                if (page) {
+                    this.currentPage = page;
+                    this.loadCurrentSection();
+                }
+            }
         });
     }
 
@@ -80,7 +92,6 @@ class GmailAIDashboard {
             this.updateOverviewStats(overview);
             await this.loadRecentEmails();
             await this.loadRecentResponses();
-            await this.loadCharts();
         } catch (error) {
             console.error('Error loading dashboard:', error);
             this.showError('Erro ao carregar dashboard');
@@ -91,21 +102,17 @@ class GmailAIDashboard {
         if (data && data.summary) {
             const totalEmailsEl = document.getElementById('total-emails');
             const emailsTodayEl = document.getElementById('emails-today');
-            const emailGrowthEl = document.getElementById('email-growth');
             const totalResponsesEl = document.getElementById('total-responses');
             const responsesTodayEl = document.getElementById('responses-today');
             const responseRateEl = document.getElementById('response-rate');
             const pendingResponsesEl = document.getElementById('pending-responses');
-            const classificationRateEl = document.getElementById('classification-rate');
 
             if (totalEmailsEl) totalEmailsEl.textContent = data.summary.total_emails || 0;
             if (emailsTodayEl) emailsTodayEl.textContent = data.summary.emails_today || 0;
-            if (emailGrowthEl) emailGrowthEl.textContent = `+${data.summary.email_growth_pct || 0}%`;
             if (totalResponsesEl) totalResponsesEl.textContent = data.summary.total_responses || 0;
             if (responsesTodayEl) responsesTodayEl.textContent = data.summary.responses_today || 0;
-            if (responseRateEl) responseRateEl.textContent = `${data.processing.response_rate || 0}%`;
+            if (responseRateEl) responseRateEl.textContent = `${data.processing?.response_rate || 0}%`;
             if (pendingResponsesEl) pendingResponsesEl.textContent = data.summary.pending_responses || 0;
-            if (classificationRateEl) classificationRateEl.textContent = `${data.classification.classification_rate || 0}%`;
         }
     }
 
@@ -137,7 +144,6 @@ class GmailAIDashboard {
                         <small>${this.formatTime(email.received_at)}</small>
                     </div>
                     <p class="mb-1">${email.subject}</p>
-                    <small class="text-muted">${email.body_preview ? email.body_preview.substring(0, 100) + '...' : ''}</small>
                 </div>
             `).join('');
         } else if (container) {
@@ -162,83 +168,6 @@ class GmailAIDashboard {
             `).join('');
         } else if (container) {
             container.innerHTML = '<div class="text-center text-muted py-3">Nenhuma resposta recente</div>';
-        }
-    }
-
-    async loadCharts() {
-        try {
-            this.renderVolumeChart();
-            this.renderClassificationChart();
-        } catch (error) {
-            console.error('Error loading charts:', error);
-        }
-    }
-
-    renderVolumeChart() {
-        const ctx = document.getElementById('emailVolumeChart');
-        if (ctx) {
-            const last7Days = [];
-            const emailCounts = [];
-            for (let i = 6; i >= 0; i--) {
-                const date = new Date();
-                date.setDate(date.getDate() - i);
-                last7Days.push(date.toLocaleDateString('pt-BR', { month: 'short', day: 'numeric' }));
-                emailCounts.push(Math.floor(Math.random() * 20) + 5);
-            }
-
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: last7Days,
-                    datasets: [{
-                        label: 'Emails por Dia',
-                        data: emailCounts,
-                        borderColor: '#007bff',
-                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-        }
-    }
-
-    renderClassificationChart() {
-        const ctx = document.getElementById('classificationChart');
-        if (ctx) {
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Vendas', 'Suporte', 'Informação', 'Outros'],
-                    datasets: [{
-                        data: [45, 25, 20, 10],
-                        backgroundColor: [
-                            '#28a745',
-                            '#ffc107', 
-                            '#17a2b8',
-                            '#6c757d'
-                        ]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
         }
     }
 
@@ -290,7 +219,6 @@ class GmailAIDashboard {
                             <th>Assunto</th>
                             <th>Data</th>
                             <th>Status</th>
-                            <th>Tipo</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
@@ -306,7 +234,7 @@ class GmailAIDashboard {
                                 <td>
                                     <div>
                                         <strong>${email.subject}</strong><br>
-                                        <small class="text-muted">${email.body_preview ? email.body_preview.substring(0, 80) + '...' : ''}</small>
+                                        <small class="text-muted">${email.body_preview || ''}</small>
                                     </div>
                                 </td>
                                 <td>
@@ -316,21 +244,13 @@ class GmailAIDashboard {
                                     <span class="badge bg-${this.getStatusColor(email.status)}">${this.getStatusText(email.status)}</span>
                                 </td>
                                 <td>
-                                    ${email.classification && email.classification.type ? 
-                                        `<span class="badge bg-info">${email.classification.type}</span>` : 
-                                        '<span class="badge bg-secondary">N/A</span>'
-                                    }
-                                </td>
-                                <td>
                                     <div class="btn-group btn-group-sm">
                                         <button class="btn btn-outline-primary" onclick="app.viewEmail('${email.id}')">
                                             <i class="fas fa-eye"></i>
                                         </button>
-                                        ${email.status === 'pending' || email.status === 'processed' ? `
-                                            <button class="btn btn-outline-success" onclick="app.generateResponse('${email.id}')">
-                                                <i class="fas fa-reply"></i>
-                                            </button>
-                                        ` : ''}
+                                        <button class="btn btn-outline-success" onclick="app.generateResponse('${email.id}')">
+                                            <i class="fas fa-reply"></i>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -346,18 +266,15 @@ class GmailAIDashboard {
 
     async loadResponses() {
         try {
-            const container = document.getElementById('responses-section');
-            if (container) {
-                this.showLoading('responses-section');
-                
-                const params = new URLSearchParams({
-                    page: this.currentPage,
-                    per_page: this.itemsPerPage
-                });
+            this.showLoading('responses-table-container');
+            
+            const params = new URLSearchParams({
+                page: this.currentPage,
+                per_page: this.itemsPerPage
+            });
 
-                const data = await this.apiCall(`/api/responses/?${params}`);
-                this.renderResponses(data);
-            }
+            const data = await this.apiCall(`/api/responses/?${params}`);
+            this.renderResponses(data);
         } catch (error) {
             console.error('Error loading responses:', error);
             this.showError('Erro ao carregar respostas');
@@ -386,7 +303,6 @@ class GmailAIDashboard {
                         <tr>
                             <th>Para</th>
                             <th>Assunto</th>
-                            <th>Template</th>
                             <th>Data</th>
                             <th>Status</th>
                             <th>Ações</th>
@@ -403,15 +319,9 @@ class GmailAIDashboard {
                                 </td>
                                 <td>
                                     <div>
-                                        <strong>Re: ${response.email.subject}</strong><br>
-                                        <small class="text-muted">${response.response_text ? response.response_text.substring(0, 60) + '...' : ''}</small>
+                                        <strong>${response.subject}</strong><br>
+                                        <small class="text-muted">${response.body_preview || ''}</small>
                                     </div>
-                                </td>
-                                <td>
-                                    ${response.template ? 
-                                        `<span class="badge bg-info">${response.template.name}</span>` : 
-                                        '<span class="badge bg-secondary">Manual</span>'
-                                    }
                                 </td>
                                 <td>
                                     <small>${this.formatDate(response.created_at)}</small>
@@ -424,12 +334,9 @@ class GmailAIDashboard {
                                         <button class="btn btn-outline-primary" onclick="app.viewResponse('${response.id}')">
                                             <i class="fas fa-eye"></i>
                                         </button>
-                                        ${response.status === 'pending' ? `
+                                        ${response.status === 'draft' ? `
                                             <button class="btn btn-outline-success" onclick="app.approveResponse('${response.id}')">
                                                 <i class="fas fa-check"></i>
-                                            </button>
-                                            <button class="btn btn-outline-warning" onclick="app.editResponse('${response.id}')">
-                                                <i class="fas fa-edit"></i>
                                             </button>
                                         ` : ''}
                                         ${response.status === 'approved' ? `
@@ -452,18 +359,15 @@ class GmailAIDashboard {
 
     async loadTemplates() {
         try {
-            const container = document.getElementById('templates-section');
-            if (container) {
-                this.showLoading('templates-section');
-                
-                const params = new URLSearchParams({
-                    page: this.currentPage,
-                    per_page: this.itemsPerPage
-                });
+            this.showLoading('templates-grid-container');
+            
+            const params = new URLSearchParams({
+                page: this.currentPage,
+                per_page: this.itemsPerPage
+            });
 
-                const data = await this.apiCall(`/api/templates/?${params}`);
-                this.renderTemplates(data);
-            }
+            const data = await this.apiCall(`/api/templates/?${params}`);
+            this.renderTemplates(data);
         } catch (error) {
             console.error('Error loading templates:', error);
             this.showError('Erro ao carregar templates');
@@ -480,9 +384,6 @@ class GmailAIDashboard {
                     <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
                     <h5>Nenhum template encontrado</h5>
                     <p class="text-muted">Não há templates para exibir no momento.</p>
-                    <button class="btn btn-primary" onclick="app.showCreateTemplateModal()">
-                        <i class="fas fa-plus"></i> Criar Template
-                    </button>
                 </div>
             `;
             return;
@@ -495,19 +396,16 @@ class GmailAIDashboard {
                         <div class="card h-100" data-template-id="${template.id}">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h6 class="mb-0">${template.name}</h6>
-                                <div>
-                                    <span class="badge bg-${template.is_active ? 'success' : 'secondary'}">
-                                        ${template.is_active ? 'Ativo' : 'Inativo'}
-                                    </span>
-                                    <span class="badge bg-info ms-1">${template.category}</span>
-                                </div>
+                                <span class="badge bg-${template.is_active ? 'success' : 'secondary'}">
+                                    ${template.is_active ? 'Ativo' : 'Inativo'}
+                                </span>
                             </div>
                             <div class="card-body">
                                 <p class="card-text text-muted small">
                                     ${template.description || 'Sem descrição'}
                                 </p>
                                 <div class="template-preview bg-light p-2 rounded small" style="max-height: 100px; overflow: hidden;">
-                                    ${template.content.substring(0, 150)}...
+                                    ${template.body_preview || ''}
                                 </div>
                             </div>
                             <div class="card-footer">
@@ -516,9 +414,6 @@ class GmailAIDashboard {
                                     <div class="btn-group btn-group-sm">
                                         <button class="btn btn-outline-primary" onclick="app.viewTemplate('${template.id}')">
                                             <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-outline-warning" onclick="app.editTemplate('${template.id}')">
-                                            <i class="fas fa-edit"></i>
                                         </button>
                                         <button class="btn btn-outline-${template.is_active ? 'secondary' : 'success'}" onclick="app.toggleTemplate('${template.id}')">
                                             <i class="fas fa-${template.is_active ? 'pause' : 'play'}"></i>
@@ -540,8 +435,6 @@ class GmailAIDashboard {
         try {
             const container = document.getElementById('admin-section');
             if (container) {
-                this.showLoading('admin-section');
-                
                 container.innerHTML = `
                     <div class="row">
                         <div class="col-md-12">
@@ -574,9 +467,6 @@ class GmailAIDashboard {
                                                 <button class="btn btn-info" onclick="app.testAI()">
                                                     <i class="fas fa-flask me-1"></i>Testar IA
                                                 </button>
-                                                <button class="btn btn-warning" onclick="app.clearCache()">
-                                                    <i class="fas fa-trash me-1"></i>Limpar Cache
-                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -594,16 +484,10 @@ class GmailAIDashboard {
 
     async processEmails() {
         try {
-            this.showLoading();
+            this.showAlert('Processando emails...', 'info');
             const result = await this.apiCall('/api/emails/process', 'POST');
-            
-            this.showSuccess(`Processamento iniciado! ${result.processed_count || 0} emails processados`);
-            
-            setTimeout(() => {
-                this.loadDashboard();
-            }, 2000);
-            
-            return result;
+            this.showSuccess(`Processamento concluído! ${result.processed_count || 0} emails processados`);
+            setTimeout(() => this.loadDashboard(), 2000);
         } catch (error) {
             console.error('Error processing emails:', error);
             this.showError('Erro ao processar emails');
@@ -613,11 +497,9 @@ class GmailAIDashboard {
     async testAI() {
         try {
             const result = await this.apiCall('/api/admin/test-ai', 'POST', {
-                test_message: 'Este é um teste de conectividade com a IA'
+                test_message: 'Teste de conectividade com IA'
             });
-            
-            this.showSuccess('Teste de IA realizado com sucesso');
-            console.log('AI Test Result:', result);
+            this.showSuccess('Teste de IA realizado com sucesso!');
         } catch (error) {
             console.error('Error testing AI:', error);
             this.showError('Erro ao testar IA');
@@ -626,7 +508,6 @@ class GmailAIDashboard {
 
     // Utility methods
     async apiCall(url, method = 'GET', data = null) {
-        const protocol = "https:";
         const baseUrl = "https://" + window.location.host;
         const fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : url;
 
@@ -654,7 +535,6 @@ class GmailAIDashboard {
     getActiveFilters() {
         return {
             status: document.getElementById('status-filter')?.value,
-            classification: document.getElementById('type-filter')?.value,
             account: document.getElementById('account-filter')?.value,
             search: document.getElementById('search-input')?.value
         };
@@ -702,7 +582,7 @@ class GmailAIDashboard {
 
     getResponseStatusColor(status) {
         const colors = {
-            'pending': 'warning',
+            'draft': 'warning',
             'approved': 'success',
             'sent': 'primary',
             'rejected': 'danger'
@@ -712,7 +592,7 @@ class GmailAIDashboard {
 
     getResponseStatusText(status) {
         const texts = {
-            'pending': 'Pendente',
+            'draft': 'Rascunho',
             'approved': 'Aprovada',
             'sent': 'Enviada',
             'rejected': 'Rejeitada'
@@ -724,24 +604,24 @@ class GmailAIDashboard {
         const container = document.getElementById('paginationContainer');
         if (!container || !pagination) return;
 
-        const { current_page, total_pages, has_prev, has_next } = pagination;
+        const { page, pages, has_prev, has_next } = pagination;
         
         let paginationHtml = '<nav><ul class="pagination justify-content-center">';
         
         paginationHtml += `
             <li class="page-item ${!has_prev ? 'disabled' : ''}">
-                <a class="page-link" href="#" data-page="${current_page - 1}" ${!has_prev ? 'tabindex="-1"' : ''}>
+                <a class="page-link" href="#" data-page="${page - 1}">
                     <i class="fas fa-chevron-left"></i>
                 </a>
             </li>
         `;
         
-        const startPage = Math.max(1, current_page - 2);
-        const endPage = Math.min(total_pages, current_page + 2);
+        const startPage = Math.max(1, page - 2);
+        const endPage = Math.min(pages, page + 2);
         
         for (let i = startPage; i <= endPage; i++) {
             paginationHtml += `
-                <li class="page-item ${i === current_page ? 'active' : ''}">
+                <li class="page-item ${i === page ? 'active' : ''}">
                     <a class="page-link" href="#" data-page="${i}">${i}</a>
                 </li>
             `;
@@ -749,7 +629,7 @@ class GmailAIDashboard {
         
         paginationHtml += `
             <li class="page-item ${!has_next ? 'disabled' : ''}">
-                <a class="page-link" href="#" data-page="${current_page + 1}" ${!has_next ? 'tabindex="-1"' : ''}>
+                <a class="page-link" href="#" data-page="${page + 1}">
                     <i class="fas fa-chevron-right"></i>
                 </a>
             </li>
@@ -785,20 +665,14 @@ class GmailAIDashboard {
         this.showAlert(message, 'success');
     }
 
-    showInfo(message) {
-        this.showAlert(message, 'info');
-    }
-
     showAlert(message, type = 'info') {
         const alertContainer = document.getElementById('alertContainer') || document.body;
         const alertId = 'alert-' + Date.now();
         
         const alertHtml = `
-            <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert">
+            <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show position-fixed" style="top: 20px; right: 20px; z-index: 9999;" role="alert">
                 ${message}
-                <button type="button" class="close" data-dismiss="alert">
-                    <span>&times;</span>
-                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         `;
         
@@ -827,49 +701,108 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Create app object with all necessary functions
     window.app = {
-        // Dashboard reference
         dashboard: window.dashboard,
         
         processEmails: function() {
-            if (window.dashboard) {
-                return window.dashboard.processEmails();
-            }
+            return window.dashboard.processEmails();
         },
+        
         filterEmails: function() {
-            if (window.dashboard) {
-                window.dashboard.currentPage = 1;
-                return window.dashboard.loadEmails();
-            }
+            window.dashboard.currentPage = 1;
+            return window.dashboard.loadEmails();
         },
+        
         clearFilters: function() {
-            const filters = ['account-filter', 'status-filter', 'type-filter', 'search-input'];
+            const filters = ['account-filter', 'status-filter', 'search-input'];
             filters.forEach(filterId => {
                 const element = document.getElementById(filterId);
                 if (element) {
                     element.value = '';
                 }
             });
-            
-            if (window.dashboard) {
-                window.dashboard.currentPage = 1;
-                return window.dashboard.loadEmails();
-            }
+            window.dashboard.currentPage = 1;
+            return window.dashboard.loadEmails();
         },
+        
         viewEmail: function(emailId) {
-            if (window.dashboard) {
-                return window.dashboard.viewEmail(emailId);
+            window.dashboard.showAlert('Visualizando email...', 'info');
+        },
+        
+        generateResponse: async function(emailId) {
+            try {
+                window.dashboard.showAlert('Gerando resposta...', 'info');
+                const response = await window.dashboard.apiCall(`/api/emails/${emailId}/responses`, 'POST', {
+                    custom_instructions: 'Gerar resposta profissional e cordial'
+                });
+                window.dashboard.showSuccess('Resposta gerada com sucesso!');
+                window.dashboard.loadCurrentSection();
+            } catch (error) {
+                window.dashboard.showError('Erro ao gerar resposta');
             }
         },
-        generateResponse: function(emailId) {
-            if (window.dashboard) {
-                return window.dashboard.generateResponse(emailId);
-            }
-        },
+        
         testAI: function() {
-            if (window.dashboard) {
-                return window.dashboard.testAI();
+            return window.dashboard.testAI();
+        },
+        
+        viewResponse: async function(responseId) {
+            try {
+                const response = await window.dashboard.apiCall(`/api/responses/${responseId}`);
+                window.dashboard.showAlert(`Visualizando resposta: ${response.subject}`, 'info');
+            } catch (error) {
+                window.dashboard.showError('Erro ao carregar resposta');
             }
         },
+        
+        approveResponse: async function(responseId) {
+            try {
+                await window.dashboard.apiCall(`/api/responses/${responseId}/approve`, 'POST', {
+                    approved_by: 'admin'
+                });
+                window.dashboard.showSuccess('Resposta aprovada com sucesso!');
+                window.dashboard.loadCurrentSection();
+            } catch (error) {
+                window.dashboard.showError('Erro ao aprovar resposta');
+            }
+        },
+        
+        sendResponse: async function(responseId) {
+            try {
+                await window.dashboard.apiCall(`/api/responses/${responseId}/send`, 'POST');
+                window.dashboard.showSuccess('Resposta enviada com sucesso!');
+                window.dashboard.loadCurrentSection();
+            } catch (error) {
+                window.dashboard.showError('Erro ao enviar resposta');
+            }
+        },
+        
+        viewTemplate: async function(templateId) {
+            try {
+                const template = await window.dashboard.apiCall(`/api/templates/${templateId}`);
+                window.dashboard.showAlert(`Visualizando template: ${template.name}`, 'info');
+            } catch (error) {
+                window.dashboard.showError('Erro ao carregar template');
+            }
+        },
+        
+        toggleTemplate: async function(templateId) {
+            try {
+                await window.dashboard.apiCall(`/api/templates/${templateId}/toggle`, 'POST');
+                window.dashboard.showSuccess('Status do template alterado!');
+                window.dashboard.loadCurrentSection();
+            } catch (error) {
+                window.dashboard.showError('Erro ao alterar template');
+            }
+        },
+        
+        editTemplate: function(templateId) {
+            window.dashboard.showAlert('Função de edição em desenvolvimento', 'info');
+        },
+        
+        editResponse: function(responseId) {
+            window.dashboard.showAlert('Função de edição em desenvolvimento', 'info');
+        },
+        
         clearCache: function() {
             if ('caches' in window) {
                 caches.keys().then(function(names) {
@@ -879,154 +812,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
             window.location.reload(true);
-        },
-        
-        // Response functions
-        generateBulkResponses: function() {
-            if (window.dashboard) {
-                window.dashboard.showAlert('Gerando respostas em lote...', 'info');
-            }
-        },
-        filterResponses: function() {
-            if (window.dashboard) {
-                window.dashboard.currentPage = 1;
-                return window.dashboard.loadResponses();
-            }
-        },
-        clearResponseFilters: function() {
-            const filters = ['response-status-filter', 'response-template-filter', 'response-search-input'];
-            filters.forEach(filterId => {
-                const element = document.getElementById(filterId);
-                if (element) {
-                    element.value = '';
-                }
-            });
-            
-            if (window.dashboard) {
-                window.dashboard.currentPage = 1;
-                return window.dashboard.loadResponses();
-            }
-        },
-        viewResponse: function(responseId) {
-            if (window.dashboard) {
-                window.dashboard.showAlert('Visualizando resposta...', 'info');
-            }
-        },
-        approveResponse: function(responseId) {
-            if (window.dashboard) {
-                window.dashboard.showAlert('Aprovando resposta...', 'info');
-            }
-        },
-        editResponse: function(responseId) {
-            if (window.dashboard) {
-                window.dashboard.showAlert('Função de edição em desenvolvimento', 'info');
-            }
-        },
-        sendResponse: function(responseId) {
-            if (window.dashboard) {
-                window.dashboard.showAlert('Enviando resposta...', 'info');
-            }
-        },
-        generateResponseFromModal: function() {
-            const emailId = document.getElementById('responseEmailId')?.value;
-            if (emailId && window.dashboard) {
-                return window.dashboard.generateResponse(emailId);
-            }
-        },
-        generateAIResponse: function() {
-            if (window.dashboard) {
-                window.dashboard.showAlert('Gerando resposta com IA...', 'info');
-            }
-        },
-        saveResponse: function() {
-            const emailId = document.getElementById('responseEmailId')?.value;
-            const content = document.getElementById('responseContent')?.value;
-            
-            if (!content || !content.trim()) {
-                if (window.dashboard) {
-                    window.dashboard.showAlert('Por favor, insira o conteúdo da resposta', 'warning');
-                }
-                return;
-            }
-            
-            if (window.dashboard) {
-                window.dashboard.showAlert('Salvando resposta...', 'info');
-            }
-        },
-        
-        // Template functions
-        showCreateTemplateModal: function() {
-            const templateId = document.getElementById('templateId');
-            const templateName = document.getElementById('templateName');
-            const templateCategory = document.getElementById('templateCategory');
-            const templateDescription = document.getElementById('templateDescription');
-            const templateContent = document.getElementById('templateContent');
-            const templateActive = document.getElementById('templateActive');
-            const templateModalTitle = document.getElementById('templateModalTitle');
-            
-            if (templateId) templateId.value = '';
-            if (templateName) templateName.value = '';
-            if (templateCategory) templateCategory.value = 'vendas';
-            if (templateDescription) templateDescription.value = '';
-            if (templateContent) templateContent.value = '';
-            if (templateActive) templateActive.checked = true;
-            if (templateModalTitle) templateModalTitle.textContent = 'Novo Template';
-            
-            const modal = document.getElementById('templateModal');
-            if (modal && typeof bootstrap !== 'undefined') {
-                const bsModal = new bootstrap.Modal(modal);
-                bsModal.show();
-            }
-        },
-        filterTemplatesByCategory: function(category) {
-            document.querySelectorAll('.btn-group .btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            if (event && event.target) {
-                event.target.classList.add('active');
-            }
-            
-            if (window.dashboard) {
-                window.dashboard.showAlert(`Filtrando templates por: ${category}`, 'info');
-            }
-        },
-        viewTemplate: function(templateId) {
-            if (window.dashboard) {
-                window.dashboard.showAlert('Visualizando template...', 'info');
-            }
-        },
-        editTemplate: function(templateId) {
-            if (window.dashboard) {
-                window.dashboard.showAlert('Carregando template para edição...', 'info');
-            }
-        },
-        toggleTemplate: function(templateId) {
-            if (window.dashboard) {
-                window.dashboard.showAlert('Alterando status do template...', 'info');
-            }
-        },
-        saveTemplate: function() {
-            const templateName = document.getElementById('templateName');
-            const templateContent = document.getElementById('templateContent');
-            
-            if (!templateName || !templateName.value.trim() || !templateContent || !templateContent.value.trim()) {
-                if (window.dashboard) {
-                    window.dashboard.showAlert('Por favor, preencha nome e conteúdo do template', 'warning');
-                }
-                return;
-            }
-            
-            if (window.dashboard) {
-                window.dashboard.showAlert('Salvando template...', 'info');
-                
-                const modal = document.getElementById('templateModal');
-                if (modal && typeof bootstrap !== 'undefined') {
-                    const bsModal = bootstrap.Modal.getInstance(modal);
-                    if (bsModal) {
-                        bsModal.hide();
-                    }
-                }
-            }
         }
     };
 });
