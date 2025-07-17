@@ -196,19 +196,37 @@ class GmailAIDashboard {
     }
 
     renderEmails(data) {
+        console.log('🔍 DEBUG renderEmails - Iniciando renderização:', data);
+        
         const container = document.getElementById('emails-table-container');
-        if (!container) return;
+        if (!container) {
+            console.error('❌ Container emails-table-container não encontrado!');
+            return;
+        }
+        
+        console.log('✅ Container encontrado:', container);
+        
+        // LIMPEZA FORÇADA - Remove qualquer conteúdo existente
+        container.innerHTML = '';
+        container.style.display = 'none';
+        
+        console.log('🧹 Container limpo completamente');
 
         if (!data || !data.emails || data.emails.length === 0) {
-            container.innerHTML = `
+            console.log('⚠️ Nenhum email para exibir');
+            const emptyHtml = `
                 <div class="text-center py-5">
                     <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                     <h5>Nenhum email encontrado</h5>
                     <p class="text-muted">Não há emails para exibir no momento.</p>
                 </div>
             `;
+            container.innerHTML = emptyHtml;
+            container.style.display = 'block';
             return;
         }
+
+        console.log(`📧 Renderizando ${data.emails.length} emails`);
 
         const tableHtml = `
             <div class="table-responsive">
@@ -260,8 +278,22 @@ class GmailAIDashboard {
             </div>
         `;
 
+        console.log('🏗️ HTML da tabela gerado:', tableHtml.substring(0, 200) + '...');
+        
+        // RENDERIZAÇÃO FORÇADA
         container.innerHTML = tableHtml;
+        container.style.display = 'block';
+        
+        console.log('✅ Tabela renderizada com sucesso!');
+        console.log('📊 Verificando botões de ação...');
+        
+        // Verificar se os botões foram criados
+        const actionButtons = container.querySelectorAll('.btn-outline-primary');
+        console.log(`👆 ${actionButtons.length} botões de visualização encontrados`);
+        
         this.updatePagination(data.pagination);
+        
+        console.log('🎉 renderEmails concluído com sucesso!');
     }
 
     async loadResponses() {
