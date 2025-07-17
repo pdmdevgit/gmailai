@@ -724,8 +724,37 @@ document.addEventListener('DOMContentLoaded', function() {
             return window.dashboard.loadEmails();
         },
         
-        viewEmail: function(emailId) {
-            window.dashboard.showAlert('Visualizando email...', 'info');
+        viewEmail: async function(emailId) {
+            try {
+                window.dashboard.showAlert('Carregando email...', 'info');
+                
+                // Buscar detalhes do email
+                const email = await window.dashboard.apiCall(`/api/emails/${emailId}`);
+                
+                // Preencher o modal com os dados do email
+                document.getElementById('modalEmailSubject').textContent = email.subject || 'Sem assunto';
+                document.getElementById('modalEmailFrom').textContent = `${email.sender_name || email.sender_email} <${email.sender_email}>`;
+                document.getElementById('modalEmailDate').textContent = window.dashboard.formatDate(email.received_at);
+                
+                // Exibir o conteúdo do email (HTML ou texto)
+                const bodyContainer = document.getElementById('modalEmailBody');
+                if (email.body_html && email.body_html.trim()) {
+                    bodyContainer.innerHTML = email.body_html;
+                } else {
+                    bodyContainer.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit;">${email.body_text || 'Sem conteúdo'}</pre>`;
+                }
+                
+                // Armazenar ID do email para uso posterior
+                window.currentEmailId = emailId;
+                
+                // Exibir o modal
+                const emailModal = new bootstrap.Modal(document.getElementById('emailModal'));
+                emailModal.show();
+                
+            } catch (error) {
+                console.error('Error loading email details:', error);
+                window.dashboard.showError('Erro ao carregar detalhes do email');
+            }
         },
         
         generateResponse: async function(emailId) {
@@ -812,6 +841,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
             window.location.reload(true);
+        },
+        
+        generateResponseFromModal: async function() {
+            try {
+                if (!window.currentEmailId) {
+                    window.dashboard.showError('ID do email não encontrado');
+                    return;
+                }
+                
+                // Fechar o modal de visualização do email
+                const emailModal = bootstrap.Modal.getInstance(document.getElementById('emailModal'));
+                if (emailModal) {
+                    emailModal.hide();
+                }
+                
+                // Gerar resposta usando a função existente
+                await this.generateResponse(window.currentEmailId);
+                
+            } catch (error) {
+                console.error('Error generating response from modal:', error);
+                window.dashboard.showError('Erro ao gerar resposta');
+            }
         }
     };
 });
