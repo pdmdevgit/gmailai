@@ -59,49 +59,43 @@ def generate_response():
             }
         }
         
-        # Generate response using template or default
+        # Prepare email data for AI service
+        email_data = {
+            'gmail_id': email.gmail_id,
+            'sender_name': email.sender_name,
+            'sender_email': email.sender_email,
+            'subject': email.subject,
+            'body_text': email.body_text,
+            'account': email.account
+        }
+        
+        # Prepare classification data
+        classification_data = {
+            'type': email.classification_type,
+            'priority': email.classification_priority,
+            'product': email.classification_product,
+            'sentiment': email.classification_sentiment,
+            'confidence': email.classification_confidence
+        }
+        
+        # Generate response using AI service
         if template:
-            # Use template
-            response_text = template.body_template
-            response_subject = template.subject_template
-            
-            # Replace variables
-            variables = {
-                'nome': sender_name,
-                'concurso_interesse': 'concursos fiscais',  # Default value
-                'produto': email.classification_product or 'nossos cursos'
+            # Convert template to expected format
+            template_data = {
+                'subject_template': template.subject_template,
+                'body_template': template.body_template,
+                'name': template.name
             }
-            
-            for var, value in variables.items():
-                response_text = response_text.replace(f'{{{var}}}', value)
-                response_subject = response_subject.replace(f'{{{var}}}', value)
-            
-            # Generate with AI for enhancement
-            enhanced_response = ai_service.generate_response(
-                email_content=email.body_text,
-                context=context,
-                template=response_text
-            )
-            
-            if enhanced_response:
-                response_text = enhanced_response.get('body', response_text)
-                confidence = enhanced_response.get('confidence', 0.8)
-            else:
-                confidence = 0.7
-                
+            ai_response = ai_service.generate_response(email_data, classification_data, template_data)
         else:
-            # Generate without template
-            ai_response = ai_service.generate_response(
-                email_content=email.body_text,
-                context=context
-            )
-            
-            if not ai_response:
-                return jsonify({'error': 'Failed to generate AI response'}), 500
-            
-            response_text = ai_response.get('body', '')
-            response_subject = ai_response.get('subject', f"Re: {email.subject}")
-            confidence = ai_response.get('confidence', 0.0)
+            ai_response = ai_service.generate_response(email_data, classification_data)
+        
+        if not ai_response:
+            return jsonify({'error': 'Failed to generate AI response'}), 500
+        
+        response_text = ai_response.get('body_text', '')
+        response_subject = ai_response.get('subject', f"Re: {email.subject}")
+        confidence = ai_response.get('confidence', 0.0)
         
         # Create response record
         email_response = EmailResponse(
