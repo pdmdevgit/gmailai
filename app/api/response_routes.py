@@ -3,8 +3,136 @@ from datetime import datetime, timedelta
 from sqlalchemy import desc, and_, or_
 from app.models import db, Email, EmailResponse, EmailTemplate
 from app.services.gmail_service import GmailService
+from app.services.ai_service import AIService
+import re
 
 response_bp = Blueprint('response_api', __name__)
+
+@response_bp.route('/generate', methods=['POST'])
+def generate_response():
+    """Generate AI response for an email"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        email_id = data.get('email_id')
+        template_id = data.get('template_id')
+        
+        if not email_id:
+            return jsonify({'error': 'email_id is required'}), 400
+        
+        # Get email
+        email = Email.query.get_or_404(email_id)
+        
+        # Get template if provided
+        template = None
+        if template_id:
+            template = EmailTemplate.query.get_or_404(template_id)
+        
+        # Check if response already exists
+        existing_response = EmailResponse.query.filter_by(email_id=email_id).first()
+        if existing_response and existing_response.status != 'rejected':
+            return jsonify({'error': 'Response already exists for this email'}), 400
+        
+        # Initialize AI service
+        ai_service = AIService(
+            openai_api_key=current_app.config.get('OPENAI_API_KEY'),
+            anthropic_api_key=current_app.config.get('ANTHROPIC_API_KEY'),
+            model=current_app.config.get('AI_MODEL', 'gpt-4')
+        )
+        
+        # Extract sender name for personalization
+        sender_name = email.sender_name or email.sender_email.split('@')[0]
+        
+        # Prepare context for AI
+        context = {
+            'sender_name': sender_name,
+            'sender_email': email.sender_email,
+            'subject': email.subject,
+            'body': email.body_text,
+            'classification': {
+                'type': email.classification_type,
+                'priority': email.classification_priority,
+                'product': email.classification_product,
+                'sentiment': email.classification_sentiment
+            }
+        }
+        
+        # Generate response using template or default
+        if template:
+            # Use template
+            response_text = template.body_template
+            response_subject = template.subject_template
+            
+            # Replace variables
+            variables = {
+                'nome': sender_name,
+                'concurso_interesse': 'concursos fiscais',  # Default value
+                'produto': email.classification_product or 'nossos cursos'
+            }
+            
+            for var, value in variables.items():
+                response_text = response_text.replace(f'{{{var}}}', value)
+                response_subject = response_subject.replace(f'{{{var}}}', value)
+            
+            # Generate with AI for enhancement
+            enhanced_response = ai_service.generate_response(
+                email_content=email.body_text,
+                context=context,
+                template=response_text
+            )
+            
+            if enhanced_response:
+                response_text = enhanced_response.get('body', response_text)
+                confidence = enhanced_response.get('confidence', 0.8)
+            else:
+                confidence = 0.7
+                
+        else:
+            # Generate without template
+            ai_response = ai_service.generate_response(
+                email_content=email.body_text,
+                context=context
+            )
+            
+            if not ai_response:
+                return jsonify({'error': 'Failed to generate AI response'}), 500
+            
+            response_text = ai_response.get('body', '')
+            response_subject = ai_response.get('subject', f"Re: {email.subject}")
+            confidence = ai_response.get('confidence', 0.0)
+        
+        # Create response record
+        email_response = EmailResponse(
+            email_id=email_id,
+            subject=response_subject,
+            body_text=response_text,
+            body_html=f"<p>{response_text.replace(chr(10), '</p><p>')}</p>",
+            status='draft',
+            ai_model=current_app.config.get('AI_MODEL', 'gpt-4'),
+            template_used=template.name if template else 'custom',
+            generation_confidence=confidence,
+            created_at=datetime.utcnow()
+        )
+        
+        db.session.add(email_response)
+        db.session.commit()
+        
+        return jsonify({
+            'id': email_response.id,
+            'email_id': email_id,
+            'subject': response_subject,
+            'body_text': response_text,
+            'status': 'draft',
+            'confidence': confidence,
+            'template_used': template.name if template else 'custom',
+            'created_at': email_response.created_at.isoformat()
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error generating response: {str(e)}")
+        return jsonify({'error': f'Failed to generate response: {str(e)}'}), 500
 
 @response_bp.route('/', methods=['GET'])
 def get_responses():
