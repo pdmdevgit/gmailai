@@ -35,6 +35,7 @@ class Email(db.Model):
     # Status
     status = db.Column(db.String(20), default='pending', index=True)  # pending, processed, responded
     needs_human_review = db.Column(db.Boolean, default=False, index=True)
+    is_read = db.Column(db.Boolean, default=False, index=True)  # Controle manual de leitura
     
     # Relationships
     responses = db.relationship('EmailResponse', backref='email', lazy=True, cascade='all, delete-orphan')
@@ -60,10 +61,11 @@ class EmailResponse(db.Model):
     generation_confidence = db.Column(db.Float)
     
     # Status
-    status = db.Column(db.String(20), default='draft')  # draft, approved, sent, rejected
+    status = db.Column(db.String(20), default='draft')  # draft, approved, sent, rejected, draft_created
     approved_by = db.Column(db.String(100))
     approved_at = db.Column(db.DateTime)
     sent_at = db.Column(db.DateTime)
+    draft_created_at = db.Column(db.DateTime)  # Quando o rascunho foi criado no Gmail
     
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

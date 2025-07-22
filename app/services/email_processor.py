@@ -107,10 +107,10 @@ class EmailProcessor:
             email_record.processed_at = datetime.utcnow()
             db.session.commit()
             
-            # Mark as read in Gmail
-            self.gmail_service.mark_as_read(account, gmail_id)
+            # REMOVIDO: Não marcar automaticamente como lido
+            # O usuário deve ter controle total sobre quais emails são marcados como lidos
             
-            # Add processing label
+            # Add processing label (mantido para organização)
             self.gmail_service.add_label(account, gmail_id, 'AI-Processed')
             
             result = {

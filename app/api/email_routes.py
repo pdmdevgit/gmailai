@@ -583,9 +583,217 @@ def reclassify_email(email_id):
         current_app.logger.error(f"Error reclassifying email: {str(e)}")
         return jsonify({'error': 'Failed to reclassify email'}), 500
 
+@email_bp.route('/<int:email_id>/mark-as-read', methods=['POST'])
+def mark_email_as_read(email_id):
+    """Marcar email como lido no Gmail (CONTROLE MANUAL)"""
+    try:
+        email = Email.query.get_or_404(email_id)
+        
+        # Initialize Gmail service
+        gmail_service = GmailService(
+            credentials_file=current_app.config.get('GMAIL_CREDENTIALS_FILE'),
+            token_dir=current_app.config.get('GMAIL_TOKEN_DIR')
+        )
+        
+        # Mark as read in Gmail
+        success = gmail_service.mark_as_read(email.account, email.gmail_id)
+        
+        if success:
+            # Update local status
+            email.is_read = True
+            db.session.commit()
+            
+            return jsonify({
+                'id': email.id,
+                'gmail_id': email.gmail_id,
+                'is_read': True,
+                'message': 'Email marcado como lido com sucesso'
+            })
+        else:
+            return jsonify({'error': 'Falha ao marcar email como lido no Gmail'}), 500
+        
+    except Exception as e:
+        current_app.logger.error(f"Error marking email as read: {str(e)}")
+        return jsonify({'error': 'Failed to mark email as read'}), 500
+
+@email_bp.route('/<int:email_id>/create-draft', methods=['POST'])
+def create_draft_response(email_id):
+    """Criar rascunho de resposta no Gmail (NUNCA ENVIAR AUTOMATICAMENTE)"""
+    try:
+        email = Email.query.get_or_404(email_id)
+        data = request.get_json() or {}
+        
+        # Verificar se já existe uma resposta aprovada
+        response = EmailResponse.query.filter_by(
+            email_id=email.id, 
+            status='approved'
+        ).first()
+        
+        if not response:
+            return jsonify({'error': 'Nenhuma resposta aprovada encontrada para este email'}), 400
+        
+        # Initialize Gmail service
+        gmail_service = GmailService(
+            credentials_file=current_app.config.get('GMAIL_CREDENTIALS_FILE'),
+            token_dir=current_app.config.get('GMAIL_TOKEN_DIR')
+        )
+        
+        # Criar rascunho no Gmail (NÃO ENVIAR)
+        draft_created = gmail_service.create_draft(
+            account_name=email.account,
+            to_email=email.sender_email,
+            subject=response.subject,
+            body_text=response.body_text,
+            body_html=response.body_html,
+            reply_to_id=email.gmail_id
+        )
+        
+        if draft_created:
+            # Atualizar status da resposta
+            response.status = 'draft_created'
+            response.draft_created_at = datetime.utcnow()
+            db.session.commit()
+            
+            return jsonify({
+                'id': response.id,
+                'email_id': email.id,
+                'status': 'draft_created',
+                'message': 'Rascunho criado no Gmail. Acesse sua conta para revisar e enviar manualmente.'
+            })
+        else:
+            return jsonify({'error': 'Falha ao criar rascunho no Gmail'}), 500
+        
+    except Exception as e:
+        current_app.logger.error(f"Error creating draft: {str(e)}")
+        return jsonify({'error': 'Failed to create draft'}), 500
+
+@email_bp.route('/bulk-mark-read', methods=['POST'])
+def bulk_mark_as_read():
+    """Marcar múltiplos emails como lidos (CONTROLE MANUAL)"""
+    try:
+        data = request.get_json()
+        email_ids = data.get('email_ids', [])
+        
+        if not email_ids:
+            return jsonify({'error': 'email_ids é obrigatório'}), 400
+        
+        emails = Email.query.filter(Email.id.in_(email_ids)).all()
+        
+        if not emails:
+            return jsonify({'error': 'Nenhum email encontrado'}), 404
+        
+        # Initialize Gmail service
+        gmail_service = GmailService(
+            credentials_file=current_app.config.get('GMAIL_CREDENTIALS_FILE'),
+            token_dir=current_app.config.get('GMAIL_TOKEN_DIR')
+        )
+        
+        results = []
+        
+        for email in emails:
+            try:
+                success = gmail_service.mark_as_read(email.account, email.gmail_id)
+                if success:
+                    email.is_read = True
+                    results.append({'id': email.id, 'status': 'marked_as_read'})
+                else:
+                    results.append({'id': email.id, 'status': 'failed'})
+            except Exception as e:
+                results.append({'id': email.id, 'status': 'error', 'error': str(e)})
+        
+        db.session.commit()
+        
+        return jsonify({
+            'processed': len(results),
+            'results': results
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in bulk mark as read: {str(e)}")
+        return jsonify({'error': 'Failed to mark emails as read'}), 500
+
+@email_bp.route('/learning/update-from-sent', methods=['POST'])
+def update_learning_from_sent_emails():
+    """Atualizar aprendizado baseado em emails enviados manualmente"""
+    try:
+        data = request.get_json() or {}
+        account = data.get('account')
+        days_back = data.get('days_back', 30)
+        
+        if not account:
+            return jsonify({'error': 'account é obrigatório'}), 400
+        
+        # Initialize services
+        gmail_service = GmailService(
+            credentials_file=current_app.config.get('GMAIL_CREDENTIALS_FILE'),
+            token_dir=current_app.config.get('GMAIL_TOKEN_DIR')
+        )
+        
+        ai_service = AIService(
+            openai_api_key=current_app.config.get('OPENAI_API_KEY'),
+            anthropic_api_key=current_app.config.get('ANTHROPIC_API_KEY'),
+            model=current_app.config.get('AI_MODEL', 'gpt-4')
+        )
+        
+        # Buscar emails enviados recentemente
+        sent_emails = gmail_service.get_sent_emails_history(account, max_results=100, days_back=days_back)
+        
+        learning_updates = []
+        
+        for sent_email in sent_emails:
+            try:
+                # Buscar thread completa para contexto
+                thread_emails = gmail_service.get_conversation_thread(account, sent_email['thread_id'])
+                
+                if len(thread_emails) >= 2:  # Pelo menos pergunta e resposta
+                    # Identificar pergunta original e resposta
+                    original_question = None
+                    sent_response = None
+                    
+                    for thread_email in thread_emails:
+                        if not thread_email.get('is_sent', False):
+                            original_question = thread_email
+                        elif thread_email.get('is_sent', False):
+                            sent_response = thread_email
+                    
+                    if original_question and sent_response:
+                        # Analisar efetividade da resposta
+                        effectiveness = ai_service.analyze_response_effectiveness(
+                            {
+                                'original_question': original_question['body_text'],
+                                'sent_response': sent_response['body_text'],
+                                'subject': sent_response['subject']
+                            }
+                        )
+                        
+                        learning_updates.append({
+                            'thread_id': sent_email['thread_id'],
+                            'original_question_preview': original_question['body_text'][:200],
+                            'sent_response_preview': sent_response['body_text'][:200],
+                            'effectiveness_score': effectiveness.get('effectiveness_score', 0),
+                            'learned_patterns': effectiveness.get('patterns', [])
+                        })
+                        
+            except Exception as e:
+                current_app.logger.error(f"Error processing sent email for learning: {str(e)}")
+                continue
+        
+        return jsonify({
+            'account': account,
+            'days_analyzed': days_back,
+            'sent_emails_found': len(sent_emails),
+            'learning_updates': len(learning_updates),
+            'updates': learning_updates[:10],  # Primeiros 10 para preview
+            'message': f'Aprendizado atualizado com base em {len(learning_updates)} conversas analisadas'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error updating learning from sent emails: {str(e)}")
+        return jsonify({'error': 'Failed to update learning from sent emails'}), 500
+
 @email_bp.route('/process', methods=['POST'])
 def process_emails():
-    """Manually trigger email processing"""
+    """Manually trigger email processing (SEM MARCAR COMO LIDO)"""
     try:
         data = request.get_json() or {}
         account = data.get('account')
@@ -624,7 +832,8 @@ def process_emails():
         return jsonify({
             'status': 'completed',
             'results': results,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.utcnow().isoformat(),
+            'note': 'Emails processados mas NÃO marcados como lidos automaticamente'
         })
         
     except Exception as e:

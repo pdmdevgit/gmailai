@@ -311,6 +311,60 @@ class GmailService:
             logger.error(f"Error adding label to email: {str(e)}")
             return False
     
+    def create_draft(self, account_name: str, to_email: str, subject: str, 
+                    body_text: str, body_html: str = None, reply_to_id: str = None) -> bool:
+        """Create draft email (NEVER SEND AUTOMATICALLY)"""
+        try:
+            service = self.get_service(account_name)
+            
+            # Create message
+            message = MIMEMultipart('alternative')
+            message['To'] = to_email
+            message['Subject'] = subject
+            
+            # Add text part
+            text_part = MIMEText(body_text, 'plain', 'utf-8')
+            message.attach(text_part)
+            
+            # Add HTML part if provided
+            if body_html:
+                html_part = MIMEText(body_html, 'html', 'utf-8')
+                message.attach(html_part)
+            
+            # Set reply headers if replying
+            if reply_to_id:
+                original_message = service.users().messages().get(
+                    userId='me', id=reply_to_id
+                ).execute()
+                
+                headers = original_message['payload'].get('headers', [])
+                header_dict = {h['name'].lower(): h['value'] for h in headers}
+                
+                message['In-Reply-To'] = header_dict.get('message-id', '')
+                message['References'] = header_dict.get('references', '') + ' ' + header_dict.get('message-id', '')
+            
+            # Create draft (NOT SEND)
+            raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
+            draft_message = {'message': {'raw': raw_message}}
+            
+            if reply_to_id:
+                original_message = service.users().messages().get(
+                    userId='me', id=reply_to_id
+                ).execute()
+                draft_message['message']['threadId'] = original_message['threadId']
+            
+            result = service.users().drafts().create(
+                userId='me',
+                body=draft_message
+            ).execute()
+            
+            logger.info(f"Draft created successfully from {account_name} to {to_email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error creating draft from {account_name}: {str(e)}")
+            return False
+    
     def get_email_history(self, account_name: str, days_back: int = 30) -> List[Dict]:
         """Get email history for the specified number of days"""
         try:
