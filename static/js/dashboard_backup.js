@@ -1,4 +1,4 @@
-// Gmail AI Agent Dashboard JavaScript - Versão Corrigida
+// Gmail AI Agent Dashboard JavaScript - Versão Completa e Corrigida
 // Prof. Diogo Moreira Email Management System
 
 class GmailAIDashboard {
@@ -86,6 +86,26 @@ class GmailAIDashboard {
         }
     }
 
+    async loadRecentEmails() {
+        try {
+            const emails = await this.apiCall('/api/emails?per_page=5');
+            this.updateRecentEmails(emails.emails || []);
+        } catch (error) {
+            console.error('Error loading recent emails:', error);
+            // Não mostrar erro para emails recentes, apenas log
+        }
+    }
+
+    async loadRecentResponses() {
+        try {
+            const responses = await this.apiCall('/api/responses?per_page=5');
+            this.updateRecentResponses(responses.responses || []);
+        } catch (error) {
+            console.error('Error loading recent responses:', error);
+            // Não mostrar erro para respostas recentes, apenas log
+        }
+    }
+=======
     async loadDashboard() {
         try {
             console.log('🔄 Carregando dashboard...');
@@ -98,6 +118,46 @@ class GmailAIDashboard {
         } catch (error) {
             console.error('❌ Error loading dashboard:', error);
             this.showError('Erro ao carregar dashboard: ' + error.message);
+        }
+    }
+
+    async loadRecentEmails() {
+        try {
+            const emails = await this.apiCall('/api/emails?per_page=5');
+            this.updateRecentEmails(emails.emails || []);
+        } catch (error) {
+            console.error('Error loading recent emails:', error);
+            // Não mostrar erro para emails recentes, apenas log
+        }
+    }
+
+    async loadRecentResponses() {
+        try {
+            const responses = await this.apiCall('/api/responses?per_page=5');
+            this.updateRecentResponses(responses.responses || []);
+        } catch (error) {
+            console.error('Error loading recent responses:', error);
+            // Não mostrar erro para respostas recentes, apenas log
+        }
+    }
+=======
+    async loadRecentEmails() {
+        try {
+            const emails = await this.apiCall('/api/emails?per_page=5');
+            this.updateRecentEmails(emails.emails || []);
+        } catch (error) {
+            console.error('Error loading recent emails:', error);
+            // Não mostrar erro para emails recentes, apenas log
+        }
+    }
+
+    async loadRecentResponses() {
+        try {
+            const responses = await this.apiCall('/api/responses?per_page=5');
+            this.updateRecentResponses(responses.responses || []);
+        } catch (error) {
+            console.error('Error loading recent responses:', error);
+            // Não mostrar erro para respostas recentes, apenas log
         }
     }
 
@@ -125,7 +185,6 @@ class GmailAIDashboard {
             this.updateRecentEmails(emails.emails || []);
         } catch (error) {
             console.error('Error loading recent emails:', error);
-            // Não mostrar erro para emails recentes, apenas log
         }
     }
 
@@ -135,7 +194,6 @@ class GmailAIDashboard {
             this.updateRecentResponses(responses.responses || []);
         } catch (error) {
             console.error('Error loading recent responses:', error);
-            // Não mostrar erro para respostas recentes, apenas log
         }
     }
 
@@ -299,206 +357,6 @@ class GmailAIDashboard {
         this.updatePagination(data.pagination);
         
         console.log('🎉 renderEmails concluído com sucesso!');
-    }
-
-    // Utility methods
-    async apiCall(url, method = 'GET', data = null) {
-        const baseUrl = "https://" + window.location.host;
-        const fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : url;
-
-        const options = {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        };
-
-        if (data && method !== 'GET') {
-            options.body = JSON.stringify(data);
-        }
-
-        const response = await fetch(fullUrl, options);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        return await response.json();
-    }
-
-    getActiveFilters() {
-        return {
-            status: document.getElementById('status-filter')?.value,
-            account: document.getElementById('account-filter')?.value,
-            search: document.getElementById('search-input')?.value
-        };
-    }
-
-    formatDate(dateString) {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        return date.toLocaleString('pt-BR');
-    }
-
-    formatTime(dateString) {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        const now = new Date();
-        const diff = now - date;
-        
-        if (diff < 60000) return 'Agora mesmo';
-        if (diff < 3600000) return `${Math.floor(diff / 60000)} min atrás`;
-        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h atrás`;
-        return date.toLocaleDateString('pt-BR');
-    }
-
-    getStatusColor(status) {
-        const colors = {
-            'pending': 'warning',
-            'processed': 'info',
-            'responded': 'success',
-            'ignored': 'secondary',
-            'error': 'danger'
-        };
-        return colors[status] || 'secondary';
-    }
-
-    getStatusText(status) {
-        const texts = {
-            'pending': 'Pendente',
-            'processed': 'Processado',
-            'responded': 'Respondido',
-            'ignored': 'Ignorado',
-            'error': 'Erro'
-        };
-        return texts[status] || status;
-    }
-
-    getResponseStatusColor(status) {
-        const colors = {
-            'draft': 'warning',
-            'approved': 'success',
-            'sent': 'primary',
-            'rejected': 'danger'
-        };
-        return colors[status] || 'secondary';
-    }
-
-    getResponseStatusText(status) {
-        const texts = {
-            'draft': 'Rascunho',
-            'approved': 'Aprovada',
-            'sent': 'Enviada',
-            'rejected': 'Rejeitada'
-        };
-        return texts[status] || status;
-    }
-
-    updatePagination(pagination) {
-        const container = document.getElementById('paginationContainer');
-        if (!container || !pagination) return;
-
-        const { page, pages, has_prev, has_next } = pagination;
-        
-        let paginationHtml = '<nav><ul class="pagination justify-content-center">';
-        
-        paginationHtml += `
-            <li class="page-item ${!has_prev ? 'disabled' : ''}">
-                <a class="page-link" href="#" data-page="${page - 1}">
-                    <i class="fas fa-chevron-left"></i>
-                </a>
-            </li>
-        `;
-        
-        const startPage = Math.max(1, page - 2);
-        const endPage = Math.min(pages, page + 2);
-        
-        for (let i = startPage; i <= endPage; i++) {
-            paginationHtml += `
-                <li class="page-item ${i === page ? 'active' : ''}">
-                    <a class="page-link" href="#" data-page="${i}">${i}</a>
-                </li>
-            `;
-        }
-        
-        paginationHtml += `
-            <li class="page-item ${!has_next ? 'disabled' : ''}">
-                <a class="page-link" href="#" data-page="${page + 1}">
-                    <i class="fas fa-chevron-right"></i>
-                </a>
-            </li>
-        `;
-        
-        paginationHtml += '</ul></nav>';
-        container.innerHTML = paginationHtml;
-    }
-
-    showLoading(containerId = null) {
-        const loadingHtml = `
-            <div class="text-center py-5">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="sr-only">Carregando...</span>
-                </div>
-                <p class="mt-2">Carregando...</p>
-            </div>
-        `;
-        
-        if (containerId) {
-            const container = document.getElementById(containerId);
-            if (container) {
-                container.innerHTML = loadingHtml;
-            }
-        }
-    }
-
-    showError(message) {
-        this.showAlert(message, 'danger');
-    }
-
-    showSuccess(message) {
-        this.showAlert(message, 'success');
-    }
-
-    showAlert(message, type = 'info') {
-        const alertContainer = document.getElementById('alertContainer') || document.body;
-        const alertId = 'alert-' + Date.now();
-        
-        const alertHtml = `
-            <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show position-fixed" style="top: 20px; right: 20px; z-index: 9999;" role="alert">
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        
-        alertContainer.insertAdjacentHTML('afterbegin', alertHtml);
-        
-        setTimeout(() => {
-            const alert = document.getElementById(alertId);
-            if (alert) {
-                alert.remove();
-            }
-        }, 5000);
-    }
-
-    startAutoRefresh() {
-        setInterval(() => {
-            if (this.currentSection === 'dashboard') {
-                this.loadDashboard();
-            }
-        }, 300000);
-    }
-
-    async processEmails() {
-        try {
-            this.showAlert('Processando emails...', 'info');
-            const result = await this.apiCall('/api/emails/process', 'POST');
-            this.showSuccess(`Processamento concluído! ${result.processed_count || 0} emails processados`);
-            setTimeout(() => this.loadDashboard(), 2000);
-        } catch (error) {
-            console.error('Error processing emails:', error);
-            this.showError('Erro ao processar emails');
-        }
     }
 
     async loadResponses() {
@@ -719,6 +577,18 @@ class GmailAIDashboard {
         }
     }
 
+    async processEmails() {
+        try {
+            this.showAlert('Processando emails...', 'info');
+            const result = await this.apiCall('/api/emails/process', 'POST');
+            this.showSuccess(`Processamento concluído! ${result.processed_count || 0} emails processados`);
+            setTimeout(() => this.loadDashboard(), 2000);
+        } catch (error) {
+            console.error('Error processing emails:', error);
+            this.showError('Erro ao processar emails');
+        }
+    }
+
     async testAI() {
         try {
             const result = await this.apiCall('/api/admin/test-ai', 'POST', {
@@ -729,6 +599,194 @@ class GmailAIDashboard {
             console.error('Error testing AI:', error);
             this.showError('Erro ao testar IA');
         }
+    }
+
+    // Utility methods
+    async apiCall(url, method = 'GET', data = null) {
+        const baseUrl = "https://" + window.location.host;
+        const fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : url;
+
+        const options = {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        };
+
+        if (data && method !== 'GET') {
+            options.body = JSON.stringify(data);
+        }
+
+        const response = await fetch(fullUrl, options);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        return await response.json();
+    }
+
+    getActiveFilters() {
+        return {
+            status: document.getElementById('status-filter')?.value,
+            account: document.getElementById('account-filter')?.value,
+            search: document.getElementById('search-input')?.value
+        };
+    }
+
+    formatDate(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleString('pt-BR');
+    }
+
+    formatTime(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        const now = new Date();
+        const diff = now - date;
+        
+        if (diff < 60000) return 'Agora mesmo';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)} min atrás`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h atrás`;
+        return date.toLocaleDateString('pt-BR');
+    }
+
+    getStatusColor(status) {
+        const colors = {
+            'pending': 'warning',
+            'processed': 'info',
+            'responded': 'success',
+            'ignored': 'secondary',
+            'error': 'danger'
+        };
+        return colors[status] || 'secondary';
+    }
+
+    getStatusText(status) {
+        const texts = {
+            'pending': 'Pendente',
+            'processed': 'Processado',
+            'responded': 'Respondido',
+            'ignored': 'Ignorado',
+            'error': 'Erro'
+        };
+        return texts[status] || status;
+    }
+
+    getResponseStatusColor(status) {
+        const colors = {
+            'draft': 'warning',
+            'approved': 'success',
+            'sent': 'primary',
+            'rejected': 'danger'
+        };
+        return colors[status] || 'secondary';
+    }
+
+    getResponseStatusText(status) {
+        const texts = {
+            'draft': 'Rascunho',
+            'approved': 'Aprovada',
+            'sent': 'Enviada',
+            'rejected': 'Rejeitada'
+        };
+        return texts[status] || status;
+    }
+
+    updatePagination(pagination) {
+        const container = document.getElementById('paginationContainer');
+        if (!container || !pagination) return;
+
+        const { page, pages, has_prev, has_next } = pagination;
+        
+        let paginationHtml = '<nav><ul class="pagination justify-content-center">';
+        
+        paginationHtml += `
+            <li class="page-item ${!has_prev ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${page - 1}">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            </li>
+        `;
+        
+        const startPage = Math.max(1, page - 2);
+        const endPage = Math.min(pages, page + 2);
+        
+        for (let i = startPage; i <= endPage; i++) {
+            paginationHtml += `
+                <li class="page-item ${i === page ? 'active' : ''}">
+                    <a class="page-link" href="#" data-page="${i}">${i}</a>
+                </li>
+            `;
+        }
+        
+        paginationHtml += `
+            <li class="page-item ${!has_next ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${page + 1}">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+        `;
+        
+        paginationHtml += '</ul></nav>';
+        container.innerHTML = paginationHtml;
+    }
+
+    showLoading(containerId = null) {
+        const loadingHtml = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Carregando...</span>
+                </div>
+                <p class="mt-2">Carregando...</p>
+            </div>
+        `;
+        
+        if (containerId) {
+            const container = document.getElementById(containerId);
+            if (container) {
+                container.innerHTML = loadingHtml;
+            }
+        }
+    }
+
+    showError(message) {
+        this.showAlert(message, 'danger');
+    }
+
+    showSuccess(message) {
+        this.showAlert(message, 'success');
+    }
+
+    showAlert(message, type = 'info') {
+        const alertContainer = document.getElementById('alertContainer') || document.body;
+        const alertId = 'alert-' + Date.now();
+        
+        const alertHtml = `
+            <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show position-fixed" style="top: 20px; right: 20px; z-index: 9999;" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        alertContainer.insertAdjacentHTML('afterbegin', alertHtml);
+        
+        setTimeout(() => {
+            const alert = document.getElementById(alertId);
+            if (alert) {
+                alert.remove();
+            }
+        }, 5000);
+    }
+
+    startAutoRefresh() {
+        setInterval(() => {
+            if (this.currentSection === 'dashboard') {
+                this.loadDashboard();
+            }
+        }, 300000);
     }
 }
 
@@ -859,6 +917,25 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (error) {
                 window.dashboard.showError('Erro ao alterar template');
             }
+        },
+        
+        editTemplate: function(templateId) {
+            window.dashboard.showAlert('Função de edição em desenvolvimento', 'info');
+        },
+        
+        editResponse: function(responseId) {
+            window.dashboard.showAlert('Função de edição em desenvolvimento', 'info');
+        },
+        
+        clearCache: function() {
+            if ('caches' in window) {
+                caches.keys().then(function(names) {
+                    for (let name of names) {
+                        caches.delete(name);
+                    }
+                });
+            }
+            window.location.reload(true);
         },
         
         generateResponseFromModal: async function() {
