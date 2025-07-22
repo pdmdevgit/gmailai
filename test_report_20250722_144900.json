@@ -1,0 +1,18 @@
+{
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "warnings": 0,
+    "success_rate": 0.0
+  },
+  "tests": [
+    {
+      "test": "Health Check",
+      "status": "FAIL",
+      "message": "Status code: 403",
+      "details": null,
+      "timestamp": "2025-07-22T14:49:00.093473"
+    }
+  ]
+}

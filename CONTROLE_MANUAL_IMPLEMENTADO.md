@@ -144,22 +144,102 @@ Body: {"account": "contato", "days_back": 30}
 ## Endpoints Disponíveis
 
 ### Controle de Leitura
-- `POST /api/emails/{id}/mark-as-read` - Marcar como lido
-- `POST /api/emails/bulk-mark-read` - Marcar múltiplos como lidos
+
+#### Marcar Email Individual como Lido
+```bash
+curl -X POST http://localhost:5000/api/emails/123/mark-as-read \
+  -H "Content-Type: application/json"
+```
+
+#### Marcar Múltiplos Emails como Lidos
+```bash
+curl -X POST http://localhost:5000/api/emails/bulk-mark-read \
+  -H "Content-Type: application/json" \
+  -d '{"email_ids": [123, 124, 125]}'
+```
 
 ### Geração de Respostas
-- `POST /api/emails/{id}/responses` - Gerar resposta
-- `POST /api/emails/responses/{id}/approve` - Aprovar resposta
-- `PUT /api/emails/responses/{id}` - Editar resposta
+
+#### Gerar Resposta para Email
+```bash
+curl -X POST http://localhost:5000/api/emails/123/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_id": 1,
+    "custom_instructions": "Mencionar promoção especial"
+  }'
+```
+
+#### Aprovar Resposta
+```bash
+curl -X POST http://localhost:5000/api/emails/responses/456/approve \
+  -H "Content-Type: application/json" \
+  -d '{"approved_by": "usuario@exemplo.com"}'
+```
+
+#### Editar Resposta
+```bash
+curl -X PUT http://localhost:5000/api/emails/responses/456 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "subject": "Novo assunto editado",
+    "body_text": "Corpo da resposta editado"
+  }'
+```
 
 ### Criação de Rascunhos
-- `POST /api/emails/{id}/create-draft` - Criar rascunho no Gmail
+
+#### Criar Rascunho no Gmail (SEM ENVIO)
+```bash
+curl -X POST http://localhost:5000/api/emails/123/create-draft \
+  -H "Content-Type: application/json"
+```
 
 ### Aprendizado
-- `POST /api/emails/learning/update-from-sent` - Atualizar aprendizado
+
+#### Atualizar Aprendizado com Emails Enviados
+```bash
+curl -X POST http://localhost:5000/api/emails/learning/update-from-sent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account": "contato",
+    "days_back": 30
+  }'
+```
 
 ### Processamento
-- `POST /api/emails/process` - Processar emails (sem marcar como lido)
+
+#### Processar Emails (SEM MARCAR COMO LIDO)
+```bash
+curl -X POST http://localhost:5000/api/emails/process \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account": "contato",
+    "max_emails": 50
+  }'
+```
+
+### Ações em Lote
+
+#### Marcar Emails para Resposta
+```bash
+curl -X POST http://localhost:5000/api/emails/bulk-actions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email_ids": [123, 124, 125],
+    "action": "mark_for_response"
+  }'
+```
+
+#### Pular Resposta para Emails
+```bash
+curl -X POST http://localhost:5000/api/emails/bulk-actions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email_ids": [126, 127],
+    "action": "skip_response"
+  }'
+```
 
 ## Configurações Importantes
 
